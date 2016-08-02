@@ -969,7 +969,6 @@ namespace RockWeb.Blocks.Groups
                     var groupMemberIdsThatLackGroupRequirements = new GroupService( rockContext ).GroupMembersNotMeetingRequirements( _group.Id, includeWarnings ).Select( a => a.Key.Id );
 
                     List<GroupMember> groupMembersList = null;
-
                     if ( sortProperty != null && sortProperty.Property != "FirstAttended" && sortProperty.Property != "LastAttended" )
                     { 
                         groupMembersList = qry.Sort( sortProperty ).ToList();
@@ -977,6 +976,22 @@ namespace RockWeb.Blocks.Groups
                     else
                     {
                         groupMembersList = qry.OrderBy( a => a.GroupRole.Order ).ThenBy( a => a.Person.LastName ).ThenBy( a => a.Person.FirstName ).ToList();
+                    }
+
+                    // If there is a required signed document that member has not signed, show an icon in the grid
+                    var personIdsThatHaventSigned = new List<int>();
+                    if ( _group.RequiredSignatureDocumentTemplateId.HasValue )
+                    {
+                        var memberPersonIds = groupMembersList.Select( m => m.PersonId ).ToList();
+                        var personIdsThatHaveSigned = new SignatureDocumentService( rockContext )
+                            .Queryable().AsNoTracking()
+                            .Where( d =>
+                                d.SignatureDocumentTemplateId == _group.RequiredSignatureDocumentTemplateId.Value &&
+                                d.Status == SignatureDocumentStatus.Signed &&
+                                memberPersonIds.Contains( d.AppliesToPersonAlias.PersonId ) )
+                            .Select( d => d.AppliesToPersonAlias.PersonId )
+                            .ToList();
+                        personIdsThatHaventSigned = memberPersonIds.Where( m => !personIdsThatHaveSigned.Contains( m ) ).ToList();
                     }
 
                     // Since we're not binding to actual group member list, but are using AttributeField columns,
@@ -1070,13 +1085,16 @@ namespace RockWeb.Blocks.Groups
                         m.Person.LastName,
                         Name =
                         ( isExporting ? m.Person.LastName + ", " + m.Person.NickName : string.Format( photoFormat, m.PersonId, m.Person.PhotoUrl, ResolveUrl( "~/Assets/Images/person-no-photo-male.svg" ) ) +
-                        m.Person.NickName + " " + m.Person.LastName
-                            + ( hasGroupRequirements && groupMemberIdsThatLackGroupRequirements.Contains( m.Id )
+                            m.Person.NickName + " " + m.Person.LastName
+                            + ( ( hasGroupRequirements && groupMemberIdsThatLackGroupRequirements.Contains( m.Id ) ) 
                                 ? " <i class='fa fa-exclamation-triangle text-warning'></i>"
                                 : string.Empty )
                             + ( !string.IsNullOrEmpty( m.Note )
-                            ? " <i class='fa fa-file-text-o text-info'></i>"
-                            : string.Empty ) ),
+                                ? " <i class='fa fa-file-text-o text-info'></i>"
+                                : string.Empty )
+                            + ((personIdsThatHaventSigned.Contains( m.PersonId ))
+                                ? " <i class='fa fa-pencil-square-o text-danger'></i>"
+                                : string.Empty)),
                         m.Person.BirthDate,
                         m.Person.Age,
                         m.Person.ConnectionStatusValueId,
