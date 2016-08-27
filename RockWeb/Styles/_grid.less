@@ -272,10 +272,7 @@ td.grid-col-actions {
     background-color: inherit;
 
     .grid-actions a {
-      border-color: none;
-      border-style: none;
-      border-width: 0;
-      border-radius: 0;
+      border: 0;
       box-shadow: none;
     }
   }
@@ -437,16 +434,13 @@ tr.row-highlight {
 
 // unlike Bootstrap's original .table-responsive, this is applied for all widths. (i.e. NOT only applied <768px)
 .table-responsive {
-  //position: relative;  // commented out to get pop-ups from being trimmed JME 10/8/2015
   width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
   -ms-overflow-style: -ms-autohiding-scrollbar;
-}
 
-// classes to show and hide columns based on their priority
-.table-responsive {
+  // classes to show and hide columns based on their priority
   th[data-priority],
   td[data-priority] {
     display: none;

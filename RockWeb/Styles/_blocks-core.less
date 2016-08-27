@@ -112,57 +112,38 @@
   }
 }
 
-.note-deny,
-.note-danger,
-.note-security {
-  article {
-    color: @alert-danger-text;
-    background-color: @alert-danger-bg;
-    border-color: @alert-danger-border;
+
+// Temporary Mixin for Notes
+.note-variant(@background; @border; @text-color) {
+  article{
+    background-color: @background;
+    border-color: @border;
+    color: @text-color;
   }
 
   .actions a {
-    color: @alert-danger-text;
+    color: @text-color;
   }
+}
+
+.note-deny,
+.note-danger,
+.note-security {
+  .note-variant(@alert-danger-bg; @alert-danger-border; @alert-danger-text)
 }
 
 .note-approve,
 .note-success {
-  article {
-    color: @alert-success-text;
-    background-color: @alert-success-bg;
-    border-color: @alert-success-border;
-  }
-
-  .actions a {
-    color: @alert-success-text;
-  }
+  .note-variant(@alert-success-bg; @alert-success-border; @alert-success-text)
 }
 
 .note-info {
-  article {
-    color: @alert-info-text;
-    background-color: @alert-info-bg;
-    border-color: @alert-info-border;
-  }
-
-  .actions a {
-    color: @alert-info-text;
-  }
+  .note-variant(@alert-info-bg; @alert-info-border; @alert-info-text)
 }
 
 .note-warning {
-  article {
-    color: @alert-warning-text;
-    background-color: @alert-warning-bg;
-    border-color: @alert-warning-border;
-  }
-
-  .actions a {
-    color: @alert-warning-text;
-  }
+  .note-variant(@alert-warning-bg; @alert-warning-border; @alert-warning-text)
 }
-
 
 .panel-note-light {
   background: none;

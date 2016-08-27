@@ -15,12 +15,15 @@
   }
 
   // default sidebar navs on most pages
-  .nav-sub {
-    display: none;
-  }
-
+  // remove static side navbar
   // admin bar on bottom right
-  #cms-admin-footer {
+  // remove the breadcrumbs
+  // Remove the footer
+  .nav-sub,
+  .navbar-static-side,
+  #cms-admin-footer,
+  .breadcrumb,
+  footer {
     display: none;
   }
 
@@ -29,24 +32,9 @@
     content: '' !important;
   }
 
-  // center the page better after removing the left nav
-  #page-wrapper {
-    position: absolute;
-    left: -70px;
-  }
-
   #content-wrapper {
-    margin-left: 70px !important;
-  }
-
-  // remove the breadcrumbs
-  .breadcrumb {
-    display: none;
-  }
-
-  // Remove the footer 
-  footer {
-    display: none;
+    margin-left: 0;
+    min-height:auto;
   }
 
   // style panels
