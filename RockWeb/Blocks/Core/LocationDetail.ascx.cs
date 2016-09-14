@@ -78,7 +78,6 @@ namespace RockWeb.Blocks.Core
             ddlPrinter.DataBind();
             ddlPrinter.Items.Insert( 0, new ListItem( None.Text, None.IdValue ) );
 
-            RockPage.AddCSSLink( ResolveRockUrl( "~/Styles/fluidbox.css" ) );
             RockPage.AddScriptLink( ResolveRockUrl( "~/Scripts/imagesloaded.min.js" ) );
             RockPage.AddScriptLink( ResolveRockUrl( "~/Scripts/jquery.fluidbox.min.js" ) );
             ScriptManager.RegisterStartupScript( lImage, lImage.GetType(), "image-fluidbox", "$('.photo a').fluidbox();", true );

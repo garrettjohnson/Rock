@@ -134,7 +134,6 @@ namespace RockWeb.Blocks.Event
             }
             cblCalendars.SelectedIndexChanged += cblCalendars_SelectedIndexChanged;
 
-            RockPage.AddCSSLink( ResolveRockUrl( "~/Styles/fluidbox.css" ) );
             RockPage.AddScriptLink( ResolveRockUrl( "~/Scripts/imagesloaded.min.js" ) );
             RockPage.AddScriptLink( ResolveRockUrl( "~/Scripts/jquery.fluidbox.min.js" ) );
             ScriptManager.RegisterStartupScript( lImage, lImage.GetType(), "image-fluidbox", "$('.photo a').fluidbox();", true );

@@ -59,7 +59,6 @@ namespace RockWeb.Blocks.Cms
             base.OnInit( e );
             ScriptManager.RegisterStartupScript( ddlGradePicker, ddlGradePicker.GetType(), "grade-selection-" + BlockId.ToString(), ddlGradePicker.GetJavascriptForYearPicker( ypGraduation ), true );
 
-            RockPage.AddCSSLink( ResolveRockUrl( "~/Styles/fluidbox.css" ) );
             //RockPage.AddScriptLink( ResolveRockUrl( "~/Scripts/imagesloaded.min.js" ) );
             RockPage.AddScriptLink( ResolveRockUrl( "~/Scripts/jquery.fluidbox.min.js" ) );
         }

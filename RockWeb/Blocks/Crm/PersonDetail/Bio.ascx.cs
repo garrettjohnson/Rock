@@ -67,7 +67,6 @@ Because the contents of this setting will be rendered inside a &lt;ul&gt; elemen
         {
             base.OnInit( e );
 
-            RockPage.AddCSSLink( ResolveRockUrl( "~/Styles/fluidbox.css" ) );
             RockPage.AddScriptLink( ResolveRockUrl( "~/Scripts/imagesloaded.min.js" ) );
             RockPage.AddScriptLink( ResolveRockUrl( "~/Scripts/jquery.fluidbox.min.js" ) );
 

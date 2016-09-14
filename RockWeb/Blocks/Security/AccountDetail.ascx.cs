@@ -54,7 +54,6 @@ namespace RockWeb.Blocks.Security
         {
             base.OnInit( e );
 
-            RockPage.AddCSSLink( ResolveRockUrl( "~/Styles/fluidbox.css" ) );
             RockPage.AddScriptLink( ResolveRockUrl( "~/Scripts/imagesloaded.min.js" ) );
             RockPage.AddScriptLink( ResolveRockUrl( "~/Scripts/jquery.fluidbox.min.js" ) );
 
