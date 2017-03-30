@@ -279,6 +279,11 @@ namespace Rock.SystemGuid
         /// </summary>
         public const string PERSON_MARITAL_STATUS_SINGLE = "F19FC180-FE8F-4B72-A59C-8013E3B0EB0D";
 
+        /// <summary>
+        /// Marital Status of Divorced
+        /// </summary>
+        public const string PERSON_MARITAL_STATUS_DIVORCED = "3B689240-24C2-434B-A7B9-A4A6CBA7928C";
+
         #endregion
 
         #region Person Phone Type
@@ -443,6 +448,23 @@ namespace Rock.SystemGuid
         /// Benevolence Denied
         /// </summary>
         public const string BENEVOLENCE_DENIED = "3720671E-DA48-405F-A6D5-5E2D47436F9A";
+        #endregion
+
+        #region Interactions
+        /// <summary>
+        /// Interaction Channel Type: Website
+        /// </summary>
+        public const string INTERACTIONCHANNELTYPE_WEBSITE = "E503E77D-CF35-E09F-41A2-B213184F48E8";
+
+        /// <summary>
+        /// Interaction Channel Type: Communication
+        /// </summary>
+        public const string INTERACTIONCHANNELTYPE_COMMUNICATION = "55004F5C-A8ED-7CB7-47EE-5988E9F8E0A8";
+
+        /// <summary>
+        /// Interaction Channel Type: Content Channel
+        /// </summary>
+        public const string INTERACTIONCHANNELTYPE_CONTENTCHANNEL = "F1A19D09-E010-EEB3-465A-940A6F023CEB";
         #endregion
 
     }

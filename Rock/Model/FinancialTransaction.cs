@@ -32,7 +32,7 @@ namespace Rock.Model
     /// </summary>
     [Table( "FinancialTransaction" )]
     [DataContract]
-    public partial class FinancialTransaction : Model<FinancialTransaction>
+    public partial class FinancialTransaction : Model<FinancialTransaction>, IAnalytic
     {
         #region Entity Properties
 
@@ -202,6 +202,43 @@ namespace Rock.Model
         /// The processed date time.
         /// </value>
         public DateTime? ProcessedDateTime { get; set; }
+
+        /// <summary>
+        /// Gets or sets a flag indicating if the transaction has been settled by the processor/gateway.
+        /// </summary>
+        /// <value>
+        /// The is settled.
+        /// </value>
+        [DataMember]
+        public bool? IsSettled { get; set; }
+
+        /// <summary>
+        /// The group/batch identifier used by the processor/gateway when the transaction has been settled.
+        /// </summary>
+        /// <value>
+        /// The settled group identifier.
+        /// </value>
+        [DataMember]
+        [MaxLength( 100 )]
+        public string SettledGroupId { get; set; }
+
+        /// <summary>
+        /// Gets or sets the date that the transaction was settled by the processor/gateway.
+        /// </summary>
+        /// <value>
+        /// The settled date.
+        /// </value>
+        [DataMember]
+        public DateTime? SettledDate { get; set; }
+
+        /// <summary>
+        /// Gets or sets a flag indicating if the transaction has been reconciled or not.
+        /// </summary>
+        /// <value>
+        /// The is settled.
+        /// </value>
+        [DataMember]
+        public bool? IsReconciled { get; set; }
 
         /// <summary>
         /// Gets the status of the transaction provided by the payment gateway (i.e. Pending, Complete, Failed)

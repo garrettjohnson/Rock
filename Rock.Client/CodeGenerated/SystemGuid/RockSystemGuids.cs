@@ -23,14 +23,19 @@
 using System;
 using System.Collections.Generic;
 
+#pragma warning disable CS1591
+
 namespace Rock.Client.SystemGuid
 {
+    #pragma warning disable CS1591
     /// <summary>
     /// </summary>
     public class Attribute
     {
         public const string GLOBAL_EMAIL_LINK_PREFERENCE = "F1BECEF9-1047-E89F-4CC8-8F856750E5D0";
         public const string GLOBAL_ENABLED_LAVA_COMMANDS = "933CFB7D-C9E1-BDAE-40AD-231002A91626";
+        public const string GROUP_AGE_RANGE = "43511B8F-71D9-423A-85BF-D1CD08C1998E";
+        public const string GROUP_BIRTHDATE_RANGE = "F1A43EAB-D682-403F-A05E-CCFFBF879F32";
         public const string PERSON_ALLERGY = "DBD192C9-0AA1-46EC-92AB-A3DA8E056D31";
         public const string PERSON_ERA_CURRENTLY_AN_ERA = "CE5739C5-2156-E2AB-48E5-1337C38B935E";
         public const string PERSON_ERA_END_DATE = "4711D67E-7526-9582-4A8E-1CD7BBE1B3A2";
@@ -68,7 +73,9 @@ namespace Rock.Client.SystemGuid
     /// </summary>
     public class BlockType
     {
+        public const string CONTENT_CHANNEL_VIEW = "143A2345-3E26-4ED0-A2FE-42AAF11B4C0F";
         public const string HTML_CONTENT = "19B61D65-37E3-459F-A44F-DEF0089118A3";
+        public const string PAGE_MENU = "CACB9D1A-A820-4587-986A-D66A69EE9948";
         public const string PLUGIN_MANAGER = "F80268E6-2625-4565-AA2E-790C5E40A119";
     }
 
@@ -188,6 +195,9 @@ namespace Rock.Client.SystemGuid
         public const string GROUP_LOCATION_TYPE_WORK = "E071472A-F805-4FC4-917A-D5E3C095C35C";
         public const string GROUPTYPE_PURPOSE_CHECKIN_FILTER = "6BCED84C-69AD-4F5A-9197-5C0F9C02DD34";
         public const string GROUPTYPE_PURPOSE_CHECKIN_TEMPLATE = "4A406CB0-495B-4795-B788-52BDFDE00B01";
+        public const string INTERACTIONCHANNELTYPE_COMMUNICATION = "55004F5C-A8ED-7CB7-47EE-5988E9F8E0A8";
+        public const string INTERACTIONCHANNELTYPE_CONTENTCHANNEL = "F1A19D09-E010-EEB3-465A-940A6F023CEB";
+        public const string INTERACTIONCHANNELTYPE_WEBSITE = "E503E77D-CF35-E09F-41A2-B213184F48E8";
         public const string LOCATION_TYPE_BUILDING = "D9646A93-1667-4A44-82DA-12E1229B4695";
         public const string LOCATION_TYPE_CAMPUS = "C0D7AE35-7901-4396-870E-3AAF472AAE88";
         public const string LOCATION_TYPE_ROOM = "107C6DA1-266D-4E1C-A443-1CD37064601D";
@@ -201,6 +211,7 @@ namespace Rock.Client.SystemGuid
         public const string PERSON_CONNECTION_STATUS_PARTICIPANT = "8EBC0CEB-474D-4C1B-A6BA-734C3A9AB061";
         public const string PERSON_CONNECTION_STATUS_VISITOR = "B91BA046-BC1E-400C-B85D-638C1F4E0CE2";
         public const string PERSON_CONNECTION_STATUS_WEB_PROSPECT = "368DD475-242C-49C4-A42C-7278BE690CC2";
+        public const string PERSON_MARITAL_STATUS_DIVORCED = "3B689240-24C2-434B-A7B9-A4A6CBA7928C";
         public const string PERSON_MARITAL_STATUS_MARRIED = "5FE5A540-7D9F-433E-B47E-4229D1472248";
         public const string PERSON_MARITAL_STATUS_SINGLE = "F19FC180-FE8F-4B72-A59C-8013E3B0EB0D";
         public const string PERSON_PHONE_TYPE_HOME = "AA8732FB-2CEA-4C76-8D6D-6AAA2C6A4303";
@@ -250,6 +261,10 @@ namespace Rock.Client.SystemGuid
         public const string CONTENT_CHANNEL = "44484685-477E-4668-89A6-84F29739EB68";
         public const string CONTENT_CHANNEL_ITEM = "BF12AE64-21FB-433B-A8A4-E40E8C426DDA";
         public const string DATAVIEW = "57F8FA29-DCF1-4F74-8553-87E90F234139";
+        public const string FINANCIAL_ACCOUNT = "798BCE48-6AA7-4983-9214-F9BCEFB4521D";
+        public const string FINANCIAL_BATCH = "BDD09C8E-2C52-4D08-9062-BE7D52D190C2";
+        public const string FINANCIAL_TRANSACTION = "2C1CB26B-AB22-42D0-8164-AEDEE0DAE667";
+        public const string FINANCIAL_TRANSACTION_DETAIL = "AC4AC28B-8E7E-4D7E-85DB-DFFB4F3ADCCE";
         public const string GROUP = "9BBFDA11-0D22-40D5-902F-60ADFBC88987";
         public const string GROUP_MEMBER = "49668B95-FEDC-43DD-8085-D2B0D6343C48";
         public const string MERGE_TEMPLATE = "CD1DB988-6891-4B0F-8D1B-B0A311A3BC3E";
@@ -259,6 +274,7 @@ namespace Rock.Client.SystemGuid
         public const string PERSON = "72657ED8-D16E-492E-AC12-144C5E7567E7";
         public const string PERSON_ALIAS = "90F5E87B-F0D5-4617-8AE9-EB57E673F36F";
         public const string PROTECT_MY_MINISTRY_PROVIDER = "C16856F4-3C6B-4AFB-A0B8-88A303508206";
+        public const string REGISTRATION_TEMPLATE = "A01E3E99-A8AD-4C6C-BAAC-98795738BA70";
         public const string REPORTING_DATASELECT_LIQUIDSELECT = "C130DC52-CA31-45EE-A4F2-6C53A838EF3D";
         public const string SCHEDULE = "0B2C38A7-D79C-4F85-9757-F1B045D32C8A";
         public const string SERVICE_JOB = "52766196-A72F-4F60-997A-78E19508843D";
@@ -416,6 +432,13 @@ namespace Rock.Client.SystemGuid
         public const string GROUPTYPE_SMALL_GROUP = "50FCFB30-F51A-49DF-86F4-2B176EA1820B";
         public const string GROUPTYPE_SMALL_GROUP_SECTION = "FAB75EC6-0402-456A-BE34-252097DE4F20";
         public const string GROUPTYPE_WEEKLY_SERVICE_CHECKIN_AREA = "FEDD389A-616F-4A53-906C-63D8255631C5";
+    }
+
+    /// <summary>
+    /// </summary>
+    public class InteractionChannel
+    {
+        public const string COMMUNICATION = "C88A187F-0343-4E7C-AF3F-79A8989DFA65";
     }
 
     /// <summary>
@@ -724,4 +747,7 @@ namespace Rock.Client.SystemGuid
         public const string WORKFLOW_FORM_NOTIFICATION = "88C7D1CC-3478-4562-A301-AE7D4D7FFF6D";
     }
 
+    #pragma warning restore CS1591
 }
+
+#pragma warning restore CS1591

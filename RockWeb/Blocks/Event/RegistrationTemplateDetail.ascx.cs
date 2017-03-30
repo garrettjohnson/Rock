@@ -289,6 +289,7 @@ namespace RockWeb.Blocks.Event
 		<li>{{ registrant.PersonAlias.Person.FullName }}</li>
 	{% endfor %}
 	</ul>
+{% endif %}
 
 {% assign waitlist = Registration.Registrants | Where:'OnWaitList', true %}
 {% assign waitListCount = waitlist | Size %}
@@ -369,6 +370,7 @@ namespace RockWeb.Blocks.Event
         private List<Guid> ExpandedForms { get; set; }
         private List<RegistrationTemplateDiscount> DiscountState { get; set; }
         private List<RegistrationTemplateFee> FeeState { get; set; }
+        private int? GridFieldsDeleteIndex { get; set; }
 
         #endregion
 
@@ -446,6 +448,7 @@ namespace RockWeb.Blocks.Event
             gFields.GridRebind += gFields_GridRebind;
             gFields.RowDataBound += gFields_RowDataBound;
             gFields.GridReorder += gFields_GridReorder;
+            GridFieldsDeleteIndex = gFields.GetColumnIndexByFieldType( typeof( DeleteField ) );
 
             // assign discounts grid actions
             gDiscounts.DataKeyNames = new string[] { "Guid" };
@@ -1001,8 +1004,22 @@ namespace RockWeb.Blocks.Event
                 var attributesDB = attributeService.Get( entityTypeId, qualifierColumn, qualifierValue );
                 foreach ( var attr in attributesDB.Where( a => !selectedAttributeGuids.Contains( a.Guid ) ).ToList() )
                 {
-                    attributeService.Delete( attr );
-                    Rock.Web.Cache.AttributeCache.Flush( attr.Id );
+                    var canDeleteAttribute = true;
+                    foreach ( var form in RegistrationTemplate.Forms )
+                    {
+                        // make sure other RegistrationTemplates aren't using this AttributeId (which could happen due to an old bug)
+                        var formFieldsFromOtherRegistrationTemplatesUsingAttribute = registrationTemplateFormFieldService.Queryable().Where( a => a.AttributeId.Value == attr.Id && a.RegistrationTemplateForm.RegistrationTemplateId != RegistrationTemplate.Id ).Any();
+                        if ( formFieldsFromOtherRegistrationTemplatesUsingAttribute )
+                        {
+                            canDeleteAttribute = false;
+                        }
+                    }
+
+                    if ( canDeleteAttribute )
+                    {
+                        attributeService.Delete( attr );
+                        Rock.Web.Cache.AttributeCache.Flush( attr.Id );
+                    }
                 }
 
                 rockContext.SaveChanges();
@@ -1079,6 +1096,11 @@ namespace RockWeb.Blocks.Event
                     discount.DiscountPercentage = discountUI.DiscountPercentage;
                     discount.DiscountAmount = discountUI.DiscountAmount;
                     discount.Order = discountUI.Order;
+                    discount.MaxUsage = discountUI.MaxUsage;
+                    discount.MaxRegistrants = discountUI.MaxRegistrants;
+                    discount.MinRegistrants = discountUI.MinRegistrants;
+                    discount.StartDate = discountUI.StartDate;
+                    discount.EndDate = discountUI.EndDate;
                 }
 
                 // add/updated fees
@@ -1280,9 +1302,12 @@ namespace RockWeb.Blocks.Event
                 ( e.Row.Cells[1].Text == "First Name" || e.Row.Cells[1].Text == "Last Name" ) &&
                 e.Row.Cells[2].Text == "Person Field" )
             {
-                foreach ( var lb in e.Row.Cells[8].ControlsOfTypeRecursive<LinkButton>() )
+                if ( GridFieldsDeleteIndex.HasValue )
                 {
-                    lb.Visible = false;
+                    foreach ( var lb in e.Row.Cells[GridFieldsDeleteIndex.Value].ControlsOfTypeRecursive<LinkButton>() )
+                    {
+                        lb.Visible = false;
+                    }
                 }
             }
         }
@@ -1672,6 +1697,12 @@ namespace RockWeb.Blocks.Event
                 discount.DiscountPercentage = nbDiscountPercentage.Text.AsDecimal() * 0.01m;
                 discount.DiscountAmount = 0.0m;
             }
+
+            discount.MaxUsage = nbDiscountMaxUsage.Text.AsIntegerOrNull();
+            discount.MaxRegistrants = nbDiscountMaxRegistrants.Text.AsIntegerOrNull();
+            discount.MinRegistrants = nbDiscountMinRegistrants.Text.AsIntegerOrNull();
+            discount.StartDate = drpDiscountDateRange.LowerValue;
+            discount.EndDate = drpDiscountDateRange.UpperValue;
 
             HideDialog();
 
@@ -2442,9 +2473,17 @@ namespace RockWeb.Blocks.Event
                 RegistrationTemplateFormField formField = fieldList.FirstOrDefault( a => a.Guid.Equals( formFieldGuid ) );
                 if ( formField == null )
                 {
+                    lFieldSource.Visible = false;
+                    ddlFieldSource.Visible = true;
                     formField = new RegistrationTemplateFormField();
                     formField.Guid = formFieldGuid;
                     formField.FieldSource = RegistrationFieldSource.PersonAttribute;
+                }
+                else
+                {
+                    lFieldSource.Text = formField.FieldSource.ConvertToString();
+                    lFieldSource.Visible = true;
+                    ddlFieldSource.Visible = false;
                 }
 
                 ceAttributePreText.Text = formField.PreText;
@@ -2660,7 +2699,8 @@ namespace RockWeb.Blocks.Event
                         d.Code,
                         Discount = d.DiscountAmount > 0 ?
                             d.DiscountAmount.FormatAsCurrency() :
-                            d.DiscountPercentage.ToString( "P2" )
+                            d.DiscountPercentage.ToString( "P2" ),
+                        Limits = d.DiscountLimitsString
                     } ).ToList();
                 gDiscounts.DataBind();
             }
@@ -2695,6 +2735,12 @@ namespace RockWeb.Blocks.Event
                 nbDiscountPercentage.Visible = true;
                 cbDiscountAmount.Visible = false;
             }
+
+            nbDiscountMaxUsage.Text = discount.MaxUsage.HasValue ? discount.MaxUsage.ToString() : string.Empty;
+            nbDiscountMaxRegistrants.Text = discount.MaxRegistrants.HasValue ? discount.MaxRegistrants.ToString() : string.Empty;
+            nbDiscountMinRegistrants.Text = discount.MinRegistrants.HasValue ? discount.MinRegistrants.ToString() : string.Empty;
+            drpDiscountDateRange.LowerValue = discount.StartDate;
+            drpDiscountDateRange.UpperValue = discount.EndDate;
 
             ShowDialog( "Discounts" );
         }

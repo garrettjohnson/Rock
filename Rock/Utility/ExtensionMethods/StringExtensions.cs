@@ -59,6 +59,16 @@ namespace Rock
         }
 
         /// <summary>
+        /// Determines whether [is null or white space].
+        /// </summary>
+        /// <param name="str">The string.</param>
+        /// <returns></returns>
+        public static bool IsNullOrWhiteSpace( this string str )
+        {
+            return string.IsNullOrWhiteSpace( str );
+        }
+
+        /// <summary>
         /// Determines whether the string is made up of only digits
         /// </summary>
         /// <param name="str">The string.</param>
@@ -96,7 +106,7 @@ namespace Rock
                 Int64 hashCodeEnd = BitConverter.ToInt64( hashText, 24 );
                 hashCode = hashCodeStart ^ hashCodeMedium ^ hashCodeEnd;
             }
-            return (hashCode);
+            return ( hashCode );
         }
 
         /// <summary>
@@ -284,15 +294,19 @@ namespace Rock
         /// <summary>
         /// Replaces the last occurrence of a given string with a new value
         /// </summary>
-        /// <param name="Source">The string.</param>
-        /// <param name="Find">The search parameter.</param>
-        /// <param name="Replace">The replacement parameter.</param>
+        /// <param name="source">The string.</param>
+        /// <param name="find">The search parameter.</param>
+        /// <param name="replace">The replacement parameter.</param>
         /// <returns></returns>
-        public static string ReplaceLastOccurrence( this string Source, string Find, string Replace )
+        public static string ReplaceLastOccurrence( this string source, string find, string replace )
         {
-            int Place = Source.LastIndexOf( Find );
-            string result = Source.Remove( Place, Find.Length ).Insert( Place, Replace );
-            return result;
+            int place = source.LastIndexOf( find );
+            if ( place >= 0 )
+            {
+                return source.Remove( place, find.Length ).Insert( place, replace );
+            }
+
+            return source;
         }
 
         /// <summary>
@@ -338,13 +352,13 @@ namespace Rock
         /// Attempts to convert string to an dictionary using the |/comma and ^ delimiter Key/Value syntax.  Returns an empty dictionary if unsuccessful.
         /// </summary>
         /// <param name="str">The string.</param>
-        /// <returns></returns>                     
+        /// <returns></returns>
         public static System.Collections.Generic.Dictionary<string, string> AsDictionary( this string str )
         {
             var dictionary = new System.Collections.Generic.Dictionary<string, string>();
             string[] nameValues = str.Split( new char[] { '|' }, StringSplitOptions.RemoveEmptyEntries );
             // If we haven't found any pipes, check for commas
-            if ( nameValues.Count() == 1 && nameValues[0] == str)
+            if ( nameValues.Count() == 1 && nameValues[0] == str )
             {
                 nameValues = str.Split( new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries );
             }
@@ -374,7 +388,6 @@ namespace Rock
             }
             return null;
         }
-
 
         /// <summary>
         /// Attempts to convert string to integer.  Returns 0 if unsuccessful.
@@ -499,8 +512,8 @@ namespace Rock
         {
             if ( !string.IsNullOrWhiteSpace( str ) )
             {
-                // strip off non numeric and characters (for example, currency symbols)
-                str = Regex.Replace( str, @"[^0-9\.-]", "" );
+                // strip off non numeric and characters at the beginning of the line (currency symbols)
+                str = Regex.Replace( str, @"^[^0-9\.-]", "" );
             }
 
             double value;

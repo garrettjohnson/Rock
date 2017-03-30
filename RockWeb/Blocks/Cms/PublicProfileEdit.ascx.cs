@@ -571,6 +571,8 @@ namespace RockWeb.Blocks.Cms
                                             Rock.SystemGuid.Category.HISTORY_PERSON_DEMOGRAPHIC_CHANGES.AsGuid(),
                                             person.Id,
                                             changes );
+
+                                        changes.Clear();
                                     }
 
                                     if ( orphanedPhotoId.HasValue )
@@ -618,7 +620,7 @@ namespace RockWeb.Blocks.Cms
                                                         .FirstOrDefault();
                                         if ( familyGroup != null )
                                         {
-                                            Guid? addressTypeGuid = GetAttributeValue( "LocationType" ).AsGuidOrNull();
+                                            Guid? addressTypeGuid = GetAttributeValue( "AddressType" ).AsGuidOrNull();
                                             if ( addressTypeGuid.HasValue )
                                             {
                                                 var groupLocationService = new GroupLocationService( rockContext );

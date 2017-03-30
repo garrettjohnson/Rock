@@ -11,7 +11,9 @@
             if ($(this).val() == '1') {
                 $('.js-current-family-members').slideDown();
             } else {
-                $('.js-current-family-members').slideUp();
+                var $div = $('.js-current-family-members');
+                $div.find('input:checkbox').prop('checked', false);
+                $div.slideUp();
             }
         });
     });
@@ -74,11 +76,11 @@
                                     Help="Typical relationship of registrants that user would register." />
                                 <div id="divCurrentFamilyMembers" runat="server" class="js-current-family-members" >
                                     <Rock:RockCheckBox ID="cbShowCurrentFamilyMembers" runat="server" Label="Show Family Members" Text="Yes"
-                                        Help="If Registrans in Same Family option is set to 'Yes', should the person registering be able to select people from their family when registering (vs. having to enter the family member's information manually)?" />
+                                        Help="If Registrants in Same Family option is set to 'Yes', should the person registering be able to select people from their family when registering (vs. having to enter the family member's information manually)?" />
                                 </div>
                                 
 
-                                <Rock:RockCheckBox id="cbWaitListEnabled" runat="server" Label="Enable Wait List" Text="Yes" Help="Should a wait list be enabled when the maximum number of registrats is reached." />
+                                <Rock:RockCheckBox id="cbWaitListEnabled" runat="server" Label="Enable Wait List" Text="Yes" Help="Should a wait list be enabled when the maximum number of registrants is reached." />
                             </div>
                         </div>
 
@@ -212,7 +214,8 @@
                             <Columns>
                                 <Rock:ReorderField />
                                 <Rock:RockBoundField DataField="Code" HeaderText="Code" />
-                                <Rock:RockBoundField DataField="Discount" HeaderText="Discount" ItemStyle-HorizontalAlign="Right" />
+                                <Rock:RockBoundField DataField="Discount" HeaderText="Discount" />
+                                <Rock:RockBoundField DataField="Limits" HeaderText="Limits" />
                                 <Rock:EditField OnClick="gDiscounts_Edit" />
                                 <Rock:DeleteField OnClick="gDiscounts_Delete" />
                             </Columns>
@@ -327,8 +330,8 @@
                     </div>
 
                     <div class="actions">
-                        <asp:LinkButton ID="btnSave" runat="server" AccessKey="s" Text="Save" CssClass="btn btn-primary" OnClick="btnSave_Click" />
-                        <asp:LinkButton ID="btnCancel" runat="server" AccessKey="c" Text="Cancel" CssClass="btn btn-link" CausesValidation="false" OnClick="btnCancel_Click" />
+                        <asp:LinkButton ID="btnSave" runat="server" AccessKey="s" ToolTip="Alt+s" Text="Save" CssClass="btn btn-primary" OnClick="btnSave_Click" />
+                        <asp:LinkButton ID="btnCancel" runat="server" AccessKey="c" ToolTip="Alt+c" Text="Cancel" CssClass="btn btn-link" CausesValidation="false" OnClick="btnCancel_Click" />
                     </div>
 
                 </div>
@@ -365,7 +368,7 @@
                     </div>
 
                     <div class="actions">
-                        <asp:LinkButton ID="btnEdit" runat="server" AccessKey="m" Text="Edit" CssClass="btn btn-primary" OnClick="btnEdit_Click" />
+                        <asp:LinkButton ID="btnEdit" runat="server" AccessKey="m" ToolTip="Alt+m" Text="Edit" CssClass="btn btn-primary" OnClick="btnEdit_Click" />
                         <Rock:ModalAlert ID="mdDeleteWarning" runat="server" />
                         <Rock:HiddenFieldWithClass ID="hfHasRegistrations" runat="server" CssClass="js-has-registrations" />
                         <asp:LinkButton ID="btnDelete" runat="server" Text="Delete" CssClass="btn btn-link js-delete-template" OnClick="btnDelete_Click" CausesValidation="false" />
@@ -391,6 +394,7 @@
                 <asp:ValidationSummary ID="ValidationSummaryAttribute" runat="server" HeaderText="Please Correct the Following" CssClass="alert alert-danger" ValidationGroup="Field" />
                 <div class="row">
                     <div class="col-md-3">
+                        <Rock:RockLiteral ID="lFieldSource" runat="server" Label="Source" Visible="false" />
                         <Rock:RockDropDownList ID="ddlFieldSource" runat="server" Label="Source" AutoPostBack="true" OnSelectedIndexChanged="ddlFieldSource_SelectedIndexChanged" ValidationGroup="Field" />
                         <Rock:RockLiteral ID="lPersonField" runat="server" Label="Person Field" Visible="false" />
                         <Rock:RockDropDownList ID="ddlPersonField" runat="server" Label="Person Field" Visible="false" ValidationGroup="Field" />
@@ -426,13 +430,27 @@
             <Content>
                 <asp:HiddenField ID="hfDiscountGuid" runat="server" />
                 <asp:ValidationSummary ID="ValidationSummaryDiscount" runat="server" HeaderText="Please Correct the Following" CssClass="alert alert-danger" ValidationGroup="Discount" />
-                <Rock:RockTextBox ID="tbDiscountCode" runat="server" CssClass="input-width-xl" Label="Discount Code" ValidationGroup="Discount" Required="true" />
-                <Rock:RockRadioButtonList ID="rblDiscountType" runat="server" Label="Discount Type" RepeatDirection="Horizontal" AutoPostBack="true" OnSelectedIndexChanged="rblDiscountType_SelectedIndexChanged">
-                    <asp:ListItem Text="Percentage" Value="Percentage" />
-                    <asp:ListItem Text="Amount" Value="Amount" />
-                </Rock:RockRadioButtonList>
-                <Rock:NumberBox ID="nbDiscountPercentage" runat="server" AppendText="%" CssClass="input-width-md" Label="Discount Percentage" NumberType="Integer" ValidationGroup="Discount"  />
-                <Rock:CurrencyBox ID="cbDiscountAmount" runat="server" CssClass="input-width-md" Label="Discount Amount" ValidationGroup="Discount" />
+                <div class="row">
+                    <div class="col-md-6">
+                        <Rock:RockTextBox ID="tbDiscountCode" runat="server" CssClass="input-width-xl" Label="Discount Code" ValidationGroup="Discount" Required="true" />
+                        <Rock:RockRadioButtonList ID="rblDiscountType" runat="server" Label="Discount Type" RepeatDirection="Horizontal" AutoPostBack="true" OnSelectedIndexChanged="rblDiscountType_SelectedIndexChanged">
+                            <asp:ListItem Text="Percentage" Value="Percentage" />
+                            <asp:ListItem Text="Amount" Value="Amount" />
+                        </Rock:RockRadioButtonList>
+                        <Rock:NumberBox ID="nbDiscountPercentage" runat="server" AppendText="%" CssClass="input-width-md" Label="Discount Percentage" NumberType="Integer" ValidationGroup="Discount"  />
+                        <Rock:CurrencyBox ID="cbDiscountAmount" runat="server" CssClass="input-width-md" Label="Discount Amount" ValidationGroup="Discount" />
+                    </div>
+                    <div class="col-md-6">
+                        <Rock:NumberBox ID="nbDiscountMaxUsage" runat="server" NumberType="Integer" MinimumValue="0" Label="Maximum Usage" 
+                            Help="The maximum number of times (registrations) that the discount code can be used (leave blank for none)." />
+                        <Rock:NumberBox ID="nbDiscountMaxRegistrants" runat="server" NumberType="Integer" MinimumValue="0" Label="Maximum Registrants" 
+                            Help="The maximum number of registrants (per registration) that the discount code should apply to." />
+                        <Rock:NumberBox ID="nbDiscountMinRegistrants" runat="server" NumberType="Integer" MinimumValue="0" Label="Minimum Registrants" 
+                            Help="The minimum number of registrants (per registration) that are required in order to use this discount code." />
+                        <Rock:DateRangePicker ID="drpDiscountDateRange" runat="server" Label="Effective Dates" 
+                            Help="The beginning and/or ending date that this discount code can be used." />
+                    </div>
+                </div>
             </Content>
         </Rock:ModalDialog>
 

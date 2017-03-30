@@ -37,7 +37,7 @@ namespace Rock.UniversalSearch.IndexModels
         /// <value>
         /// The first name.
         /// </value>
-        [RockIndexField( Boost = 4 )]
+        [RockIndexField( Boost = 1 )]
         public string FirstName { get; set; }
 
         /// <summary>
@@ -46,7 +46,7 @@ namespace Rock.UniversalSearch.IndexModels
         /// <value>
         /// The name of the nick.
         /// </value>
-        [RockIndexField( Boost = 4 )]
+        [RockIndexField( Boost = 1 )]
         public string NickName { get; set; }
 
         /// <summary>
@@ -55,7 +55,7 @@ namespace Rock.UniversalSearch.IndexModels
         /// <value>
         /// The last name.
         /// </value>
-        [RockIndexField( Boost = 5 )]
+        [RockIndexField( Boost = 2 )]
         public string LastName { get; set; }
 
         /// <summary>
@@ -91,7 +91,7 @@ namespace Rock.UniversalSearch.IndexModels
         /// <value>
         /// The spouse.
         /// </value>
-        [RockIndexField( Index = IndexType.NotIndexed )]
+        [RockIndexField]
         public string Spouse { get; set; }
 
         /// <summary>
@@ -295,77 +295,6 @@ namespace Rock.UniversalSearch.IndexModels
             AddIndexableAttributes( personIndex, person );
 
             return personIndex;
-        }
-
-        /// <summary>
-        /// Gets the document URL.
-        /// </summary>
-        /// <returns></returns>
-        public override string GetDocumentUrl( Dictionary<string, object> displayOptions = null )
-        {
-            string url = "/Person/";
-
-            if ( displayOptions != null )
-            {
-                if ( displayOptions.ContainsKey( "Person.Url" ) )
-                {
-                    url = displayOptions["Person.Url"].ToString();
-                }
-            }
-
-            return url + this.Id;
-        }
-
-        /// <summary>
-        /// Formats the search result.
-        /// </summary>
-        /// <param name="currentPerson"></param>
-        /// <param name="displayOptions"></param>
-        /// <returns></returns>
-        public override FormattedSearchResult FormatSearchResult( Person currentPerson, Dictionary<string, object> displayOptions = null )
-        {
-            string url = "/Person/";
-
-            if (displayOptions != null )
-            {
-                if ( displayOptions.ContainsKey( "Person.Url" ) )
-                {
-                    url = displayOptions["Person.Url"].ToString();
-                }
-            }
-
-            var recordStatus = DefinedValueCache.Read( this.RecordStatusValueId.HasValue ? this.RecordStatusValueId.Value : 0 );
-            var connectionStatus = DefinedValueCache.Read( this.ConnectionStatusValueId.HasValue ? this.ConnectionStatusValueId.Value : 0 );
-            var campus = CampusCache.Read( this.CampusId.HasValue ? this.CampusId.Value : 0 );
-
-            return new FormattedSearchResult() { IsViewAllowed = true, FormattedResult = $@"
-                    <div class='row model-cannavigate' data-href='{url}{this.Id}'>
-                        <div class='col-sm-1 text-center'>
-                            <i class='{this.IconCssClass} fa-2x'></i>
-                        </div>
-                        <div class='col-md-3 col-sm-10'>
-                            {this.NickName} {this.LastName} {this.Suffix} <br />
-                            {(this.Email != null ? this.Email + "<br />" : "")}
-                            {(this.StreetAddress != null ? this.StreetAddress + "<br />" : "")}
-                            {(this.City != null ? this.City + ", " + this.State + " " + this.PostalCode : "")}
-                        </div>
-                        <div class='col-md-2'>
-                            Connection Status: <br /> 
-                            {(connectionStatus != null ? connectionStatus.Value : "")}
-                        </div>
-                        <div class='col-md-2'>
-                            Age: <br /> 
-                            {this.Age}
-                        </div>
-                        <div class='col-md-2'>
-                            Record Status: <br /> 
-                            {(recordStatus != null ? recordStatus.Value : "")}
-                        </div>
-                        <div class='col-md-2'>
-                            Campus: <br /> 
-                            {(campus != null ? campus.Name : "")}
-                        </div>
-                    </div>" };
         }
     }
 }
