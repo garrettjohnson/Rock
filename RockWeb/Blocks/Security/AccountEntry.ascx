@@ -70,13 +70,13 @@
 
                <fieldset>
                     <legend>New Account</legend>
-                    <Rock:RockTextBox ID="tbUserName" runat="server" Label="Username" Required="true" ></Rock:RockTextBox>
+                    <Rock:RockTextBox ID="tbUserName" runat="server" Label="Username" Required="true" autocomplete="username" ></Rock:RockTextBox>
                     <dl id="availabilityMessageRow">
                         <dt></dt>
                         <dd><div id="availabilityMessage" class="alert"/></dd>
                     </dl>
-                    <Rock:RockTextBox ID="tbPassword" runat="server" Label="Password" Required="true" TextMode="Password" ValidateRequestMode="Disabled" ></Rock:RockTextBox>
-                    <Rock:RockTextBox ID="tbPasswordConfirm" runat="server" Label="Confirmation" Required="true" TextMode="Password" ValidateRequestMode="Disabled" ></Rock:RockTextBox>
+                    <Rock:RockTextBox ID="tbPassword" runat="server" Label="Password" Required="true" TextMode="Password" ValidateRequestMode="Disabled" autocomplete="new-password" ></Rock:RockTextBox>
+                    <Rock:RockTextBox ID="tbPasswordConfirm" runat="server" Label="Confirmation" Required="true" TextMode="Password" ValidateRequestMode="Disabled" autocomplete="new-password" ></Rock:RockTextBox>
                     <asp:CompareValidator ID="covalPassword" runat="server" ControlToCompare="tbPassword" ControlToValidate="tbPasswordConfirm" ErrorMessage="Password and Confirmation do not match" Display="Dynamic" CssClass="validation-error"></asp:CompareValidator>
 
                 </fieldset>
@@ -86,10 +86,10 @@
             <div class="col-md-6">
 
                 <fieldset>
-                    <legend>Your Information</legend> 
-                    <Rock:RockTextBox ID="tbFirstName" runat="server" Label="First Name" Required="true" />
-                    <Rock:RockTextBox ID="tbLastName" runat="server" Label="Last Name" Required="true" />
-                    <Rock:EmailBox ID="tbEmail" runat="server" Label="Email" Required="true" />
+                    <legend>Your Information</legend>
+                    <Rock:RockTextBox ID="tbFirstName" runat="server" Label="First Name" Required="true" autocomplete="given-name"  />
+                    <Rock:RockTextBox ID="tbLastName" runat="server" Label="Last Name" Required="true" autocomplete="family-name" />
+                    <Rock:EmailBox ID="tbEmail" runat="server" Label="Email" Required="true" autocomplete="email" />
                     <Rock:RockDropDownList ID="ddlGender" runat="server" Label="Gender">
                         <asp:ListItem Text="" Value="U"></asp:ListItem>
                         <asp:ListItem Text="Male" Value="M"></asp:ListItem>
@@ -109,9 +109,9 @@
                                                 <div class="row">
                                                     <div class="col-sm-7">
                                                         <asp:HiddenField ID="hfPhoneType" runat="server" Value='<%# Eval("NumberTypeValueId")  %>' />
-                                                        <Rock:PhoneNumberBox ID="pnbPhone" runat="server" CountryCode='<%# Eval("CountryCode") %>' 
+                                                        <Rock:PhoneNumberBox ID="pnbPhone" runat="server" CountryCode='<%# Eval("CountryCode") %>'
                                                             Number='<%# Eval("NumberFormatted")  %>'  />
-                                                    </div>    
+                                                    </div>
                                                     <div class="col-sm-5 margin-t-sm">
                                                         <div class="row">
                                                             <div class="col-xs-6">
@@ -130,7 +130,7 @@
                                 </asp:Repeater>
                         </fieldset>
                    </asp:Panel>
-                    
+
                     <asp:Panel ID="pnlAddress" runat="server">
                         <fieldset>
                             <legend>Address</legend>
@@ -138,7 +138,7 @@
                         </fieldset>
                     </asp:Panel>
             </div>
-        
+
         </div>
 
         <div class="actions">
@@ -171,8 +171,8 @@
 
         <div class="inputs-list not-me">
             <label>
-                <input type="radio" value="0" name="DuplicatePerson" />        
-                <span>None of these are me</span>    
+                <input type="radio" value="0" name="DuplicatePerson" />
+                <span>None of these are me</span>
             </label>
         </div>
 

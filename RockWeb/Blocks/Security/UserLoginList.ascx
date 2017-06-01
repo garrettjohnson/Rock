@@ -72,7 +72,7 @@
                 </div>
                 <div class="row">
                     <div class="col-md-6">
-                        <Rock:DataTextBox ID="tbUserName" runat="server" SourceTypeName="Rock.Model.UserLogin, Rock" PropertyName="UserName" ValidationGroup="Login" />
+                        <Rock:DataTextBox ID="tbUserName" runat="server" SourceTypeName="Rock.Model.UserLogin, Rock" PropertyName="UserName" ValidationGroup="Login" autocomplete="off" />
                         <Rock:RockCheckBox ID="cbIsConfirmed" runat="server" Label="Confirmed" Text="Yes" Help="Has the user confirmed this login?" />
                         <Rock:RockCheckBox ID="cbIsLockedOut" runat="server" Label="Locked Out" Text="Yes" Help="Has the user been locked out of using this login?" />
                         <Rock:RockCheckBox ID="cbIsRequirePasswordChange" runat="server" Label="Require Password Change" Text="Yes" Help="Require the user to change the password on next login." Visible="false" />
