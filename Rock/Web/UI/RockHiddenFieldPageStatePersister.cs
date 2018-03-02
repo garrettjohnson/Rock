@@ -1,4 +1,20 @@
-﻿using System;
+﻿// <copyright>
+// Copyright by the Spark Development Network
+//
+// Licensed under the Rock Community License (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.rockrms.com/license
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+// </copyright>
+//
+using System;
 using System.Collections;
 using System.IO;
 using System.IO.Compression;
@@ -88,9 +104,9 @@ namespace Rock.Web.UI
             SizeThreshold = 102400;
         }
 
-        //
-        // Load ViewState and ControlState.
-        //
+        /// <summary>
+        /// Deserializes and loads persisted state information from an <see cref="T:System.Web.HttpRequest" /> object when a <see cref="T:System.Web.UI.Page" /> object initializes its control hierarchy.
+        /// </summary>
         public override void Load()
         {
             string viewState = Page.Request.Form["__CVIEWSTATE"];
@@ -127,9 +143,9 @@ namespace Rock.Web.UI
             ControlState = pair.Second;
         }
 
-        //
-        // Persist any ViewState and ControlState.
-        //
+        /// <summary>
+        /// Serializes any object state contained in the <see cref="P:System.Web.UI.PageStatePersister.ViewState" /> or <see cref="P:System.Web.UI.PageStatePersister.ControlState" /> property and writes the state to the response stream.
+        /// </summary>
         public override void Save()
         {
             // save the viewstate contents so we can read/parse it later

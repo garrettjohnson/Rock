@@ -116,11 +116,12 @@ namespace RockWeb.Blocks.Cms
                 }
 
                 ConfigureSettings();
-                
+
                 // if this is from the smart search apply some additional configuration
+                var showRefineSearch = PageParameter( "ShowRefineSearch" ).AsBoolean();
                 if ( !string.IsNullOrWhiteSpace( PageParameter( "SmartSearch" ) ) )
                 {
-                    ConfigureSmartSearchSettings();
+                    lbRefineSearch.Visible = showRefineSearch;
                 }
 
                 if ( !string.IsNullOrWhiteSpace(PageParameter( "Q" ) ) )
@@ -206,7 +207,7 @@ namespace RockWeb.Blocks.Cms
         /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
         protected void btnSearch_Click( object sender, EventArgs e )
         {
-            Response.Redirect( BuildUrl() );
+            Response.Redirect( BuildUrl(0, false ) );
         }
 
         /// <summary>
@@ -242,7 +243,7 @@ namespace RockWeb.Blocks.Cms
             var client = IndexContainer.GetActiveComponent();
 
             if ( indexDocumentType != null ) {
-                var document = client.GetDocumentById( indexDocumentType, documentId.AsInteger() );
+                var document = client.GetDocumentById( indexDocumentType, documentId );
 
                 var documentUrl = document.GetDocumentUrl();
 
@@ -284,105 +285,117 @@ namespace RockWeb.Blocks.Cms
             
             var client = IndexContainer.GetActiveComponent();
 
-            long totalResultsAvailable = 0;
-
-            var results = client.Search( term, searchType, selectedEntities, fieldCriteria, _itemsPerPage, _currentPageNum * _itemsPerPage, out totalResultsAvailable );
-
-            if ( GetAttributeValue( "UseCustomResults" ).AsBoolean() )
+            if ( client == null )
             {
-                var mergeFields = Rock.Lava.LavaHelper.GetCommonMergeFields( null );
-                mergeFields.Add( "Results", results );
-
-                lResults.Text = GetAttributeValue( "LavaResultTemplate" ).ResolveMergeFields( mergeFields, GetAttributeValue( "CustomResultsCommands" ) );
+                nbWarnings.Text = "No indexing service is currently configured.";
             }
             else
             {
-                StringBuilder formattedResults = new StringBuilder();
-                formattedResults.Append( "<ul class='list-unstyled'>" );
+                long totalResultsAvailable = 0;
 
-                foreach ( var result in results )
+                var results = client.Search( term, searchType, selectedEntities, fieldCriteria, _itemsPerPage, _currentPageNum * _itemsPerPage, out totalResultsAvailable );
+
+                if ( GetAttributeValue( "UseCustomResults" ).AsBoolean() )
                 {
-                    var formattedResult = result.FormatSearchResult( CurrentPerson );
+                    var mergeFields = Rock.Lava.LavaHelper.GetCommonMergeFields( null );
+                    mergeFields.Add( "Results", results );
 
-                    if ( formattedResult.IsViewAllowed )
-                    {
-                        formattedResults.Append( string.Format( "{0}", formattedResult.FormattedResult ) );
-
-                        if ( GetAttributeValue( "ShowScores" ).AsBoolean() )
-                        {
-                            formattedResults.Append( string.Format( "<div class='pull-right'><small>{0}</small></div>", result.Score ) );
-                        }
-
-                        formattedResults.Append( "<hr />" );
-                    }
-                }
-
-                formattedResults.Append( "</ul>" );
-
-                tbSearch.Text = term;
-
-                lResults.Text = formattedResults.ToString();
-            }
-
-            // pageination
-            if ( totalResultsAvailable > 0 )
-            {
-                StringBuilder pagination = new StringBuilder();
-
-                // previous button
-                if ( _currentPageNum == 0 )
-                {
-                    pagination.Append( "<li class='disabled'><span><span aria-hidden='true'>&laquo;</span></span></li>" );
+                    lResults.Text = GetAttributeValue( "LavaResultTemplate" ).ResolveMergeFields( mergeFields, GetAttributeValue( "CustomResultsCommands" ) );
                 }
                 else
                 {
-                    pagination.Append( String.Format( "<li><a href='{0}'><span><span aria-hidden='true'>&laquo;</span></span></a></li>", BuildUrl( -1 ) ) );
-                }
+                    StringBuilder formattedResults = new StringBuilder();
+                    formattedResults.Append( "<ul class='list-unstyled'>" );
 
-                var paginationOffset = 5;
-                var startPage = 1;
-                var endPage = paginationOffset * 2;
+                    var showScores = GetAttributeValue( "ShowScores" ).AsBoolean();
 
-                if ( _currentPageNum >= paginationOffset )
-                {
-                    startPage = _currentPageNum - paginationOffset;
-                    endPage = _currentPageNum + paginationOffset;
-                }
+                    // for speed we will get the common merge fields and pass them to the formatter so it does not have to be done repeattedly in the loop (it's a bit expensive)
+                    var mergeFields = Rock.Lava.LavaHelper.GetCommonMergeFields( null, CurrentPerson );
 
-                if ( (endPage * _itemsPerPage) > totalResultsAvailable )
-                {
-                    endPage = (int)Math.Ceiling( (double)totalResultsAvailable / _itemsPerPage );
-                }
-
-                if ( endPage == 1 )
-                {
-                    pnlPagination.Visible = false;
-                    return;
-                }
-
-                for ( int i = startPage; i <= endPage; i++ )
-                {
-                    if ( (_currentPageNum + 1) == i )
+                    foreach ( var result in results )
                     {
-                        pagination.Append( string.Format( "<li class='active'><span>{0} </span></li>", i ) );
+                        var formattedResult = result.FormatSearchResult( CurrentPerson, null, mergeFields );
+
+                        if ( formattedResult.IsViewAllowed )
+                        {
+                            formattedResults.Append( string.Format( "{0}", formattedResult.FormattedResult ) );
+
+                            if ( showScores )
+                            {
+                                formattedResults.Append( string.Format( "<div class='pull-right'><small>{0}</small></div>", result.Score ) );
+                            }
+
+                            formattedResults.Append( "<hr />" );
+                        }
+                    }
+
+                    formattedResults.Append( "</ul>" );
+
+                    tbSearch.Text = term;
+                    lResults.Text = formattedResults.ToString();
+                }
+
+                // pageination
+                if ( totalResultsAvailable > 0 )
+                {
+                    StringBuilder pagination = new StringBuilder();
+
+                    // previous button
+                    if ( _currentPageNum == 0 )
+                    {
+                        pagination.Append( "<li class='disabled'><span><span aria-hidden='true'>&laquo;</span></span></li>" );
                     }
                     else
                     {
-                        pagination.Append( string.Format( "<li><a href='{1}'><span>{0} </span></a></li>", i, BuildUrl( (i - _currentPageNum) - 1 ) ) );
+                        pagination.Append( String.Format( "<li><a href='{0}'><span><span aria-hidden='true'>&laquo;</span></span></a></li>", BuildUrl( -1 ) ) );
                     }
+
+                    var paginationOffset = 5;
+                    var startPage = 1;
+                    var endPage = paginationOffset * 2;
+
+                    if ( _currentPageNum >= paginationOffset )
+                    {
+                        startPage = _currentPageNum - paginationOffset;
+                        endPage = _currentPageNum + paginationOffset;
+                    }
+
+                    if ( ( endPage * _itemsPerPage ) > totalResultsAvailable )
+                    {
+                        endPage = ( int ) Math.Ceiling( ( double ) totalResultsAvailable / _itemsPerPage );
+                    }
+
+                    if ( endPage == 1 )
+                    {
+                        pnlPagination.Visible = false;
+                        return;
+                    }
+
+                    for ( int i = startPage; i <= endPage; i++ )
+                    {
+                        if ( ( _currentPageNum + 1 ) == i )
+                        {
+                            pagination.Append( string.Format( "<li class='active'><span>{0} </span></li>", i ) );
+                        }
+                        else
+                        {
+                            pagination.Append( string.Format( "<li><a href='{1}'><span>{0} </span></a></li>", i, BuildUrl( ( i - _currentPageNum ) - 1 ) ) );
+                        }
+                    }
+
+                    // next button
+                    if ( _currentPageNum == endPage )
+                    {
+                        pagination.Append( "<li class='disabled'><span><span aria-hidden='true'>&raquo;</span></span></li>" );
+                    }
+                    else
+                    {
+                        pagination.Append( String.Format( "<li><a href='{0}'><span><span aria-hidden='true'>&raquo;</span></span></a></li>", BuildUrl( 1 ) ) );
+                    }
+
+                    lPagination.Text = pagination.ToString();
                 }
 
-                // next button
-                if ( _currentPageNum == endPage )
-                {
-                    pagination.Append( "<li class='disabled'><span><span aria-hidden='true'>&raquo;</span></span></li>" );
-                }
-                else
-                {
-                    pagination.Append( String.Format( "<li><a href='{0}'><span><span aria-hidden='true'>&raquo;</span></span></a></li>", BuildUrl( 1 ) ) );
-                }
-
-                lPagination.Text = pagination.ToString();
             }
         }
 
@@ -506,7 +519,7 @@ namespace RockWeb.Blocks.Cms
         /// Builds the URL.
         /// </summary>
         /// <returns></returns>
-        private string BuildUrl(int pageOffset = 0)
+        private string BuildUrl(int pageOffset = 0, Boolean respectSmartSearch = true) // respect smart search flag allows a search that started as a smart search to be converted to a normal search via refining the search
         {
             var pageReference = new PageReference();
             pageReference.PageId = CurrentPageReference.PageId;
@@ -517,7 +530,7 @@ namespace RockWeb.Blocks.Cms
                 pageReference.Parameters.AddOrReplace("Q", tbSearch.Text);
             }
 
-            if ( PageParameter("SmartSearch").IsNotNullOrWhitespace() )
+            if ( PageParameter("SmartSearch").IsNotNullOrWhitespace() && respectSmartSearch )
             {
                 pageReference.Parameters.AddOrReplace( "SmartSearch", "true" );
             }
@@ -732,7 +745,7 @@ namespace RockWeb.Blocks.Cms
                 indexableEntities = indexableEntities.Where( i => enabledModelIds.Contains( i.Id ) ).ToList();
             }
 
-                foreach ( var entity in indexableEntities )
+            foreach ( var entity in indexableEntities )
             {
                 var entityType = entity.GetEntityType();
 
@@ -771,14 +784,6 @@ namespace RockWeb.Blocks.Cms
                     }
                 }
             }
-        }
-
-        /// <summary>
-        /// Configures the smart search settings.
-        /// </summary>
-        private void ConfigureSmartSearchSettings()
-        {
-            lbRefineSearch.Visible = false;
         }
 
         /// <summary>

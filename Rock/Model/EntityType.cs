@@ -15,6 +15,7 @@
 // </copyright>
 //
 using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Data.Entity.ModelConfiguration;
@@ -29,6 +30,7 @@ namespace Rock.Model
     /// <summary>
     /// 
     /// </summary>
+    [RockDomain( "Core" )]
     [NotAudited]
     [Table( "EntityType" )]
     [DataContract]
@@ -156,6 +158,7 @@ namespace Rock.Model
         /// <value>
         /// <c>true</c> if this instance is analytic supported; otherwise, <c>false</c>.
         /// </value>
+        [Obsolete( "Use EntityTypeCache.IsAnalyticsSupported(..) instead") ]
         public bool IsAnalyticSupported
         {
             get
@@ -181,6 +184,7 @@ namespace Rock.Model
         /// <value>
         /// <c>true</c> if this instance is analytic historical supported; otherwise, <c>false</c>.
         /// </value>
+        [Obsolete( "Use EntityTypeCache.IsAnalyticHistoricalSupported(..) instead" )]
         public bool IsAnalyticHistoricalSupported
         {
             get
@@ -252,6 +256,14 @@ namespace Rock.Model
         /// </value>
         public string IndexDocumentUrl { get; set; }
 
+        /// <summary>
+        /// Gets or sets a lava template that can be used for generating a link to view details for this entity (i.e. "~/person/{{ Entity.Id }}").
+        /// </summary>
+        /// <value>
+        /// The link URL.
+        /// </value>
+        public string LinkUrlLavaTemplate { get; set; }
+
         #endregion
 
         #region virtual Properties
@@ -262,6 +274,7 @@ namespace Rock.Model
         /// <value>
         /// A <see cref="System.Boolean"/> value that is <c>true</c> if this instance is system; otherwise, <c>false</c>.
         /// </value>
+        [LavaInclude]
         public virtual bool IsSystem
         {
             get { return IsSecured || IsEntity; }

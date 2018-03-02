@@ -293,6 +293,8 @@ This {{ Workflow.WorkflowType.WorkTerm }} does not currently require your attent
                 service.Delete( workflowType );
 
                 rockContext.SaveChanges();
+
+                WorkflowTypeCache.Flush( workflowType.Id );
             }
 
             // reload page
@@ -666,7 +668,7 @@ This {{ Workflow.WorkflowType.WorkTerm }} does not currently require your attent
 
                 // Delete any workflow actions of this type
                 int loopCounter = 0;
-                foreach ( var action in workflowActionService.Queryable().Where( a => a.ActionTypeId == actionType.Id ) )
+                foreach ( var action in workflowActionService.Queryable().Where( a => a.ActionTypeId == actionType.Id ).ToList() )
                 {
                     workflowActionService.Delete( action );
                     loopCounter++;
@@ -691,7 +693,7 @@ This {{ Workflow.WorkflowType.WorkTerm }} does not currently require your attent
             {
                 // Delete any workflow activities of this type
                 int loopCounter = 0;
-                foreach ( var activity in workflowActivityService.Queryable().Where( a => a.ActivityTypeId == activityType.Id ) )
+                foreach ( var activity in workflowActivityService.Queryable().Where( a => a.ActivityTypeId == activityType.Id ).ToList() )
                 {
                     workflowActivityService.Delete( activity );
                     loopCounter++;
@@ -832,6 +834,8 @@ This {{ Workflow.WorkflowType.WorkTerm }} does not currently require your attent
                     workflowActionType.SaveAttributeValues( rockContext );
                 }
             }
+
+            WorkflowTypeCache.Flush( workflowType.Id );
 
             var qryParams = new Dictionary<string, string>();
             qryParams["workflowTypeId"] = workflowType.Id.ToString();
@@ -1455,6 +1459,16 @@ This {{ Workflow.WorkflowType.WorkTerm }} does not currently require your attent
                 hlType.Visible = false;
             }
 
+            if ( workflowType.Id != 0 )
+            {
+                hlType.Visible = true;
+                hlType.Text = string.Format( "Id: {0}", workflowType.Id );
+            }
+            else
+            {
+                hlType.Visible = false;
+            }
+
             lWorkflowTypeDescription.Text = workflowType.Description;
 
             if ( workflowType.ActivityTypes.Count > 0 )
@@ -2000,7 +2014,7 @@ This {{ Workflow.WorkflowType.WorkTerm }} does not currently require your attent
 
             // Delete any of those attributes that were removed in the UI
             var selectedAttributeGuids = attributes.Select( a => a.Guid );
-            foreach ( var attr in existingAttributes.Where( a => !selectedAttributeGuids.Contains( a.Guid ) ) )
+            foreach ( var attr in existingAttributes.Where( a => !selectedAttributeGuids.Contains( a.Guid ) ).ToList() )
             {
                 attributeService.Delete( attr );
                 rockContext.SaveChanges();

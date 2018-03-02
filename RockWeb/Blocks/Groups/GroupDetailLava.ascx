@@ -42,7 +42,7 @@
 
             <div class="row">
                 <div class="col-md-12">
-                    <asp:PlaceHolder ID="phAttributes" runat="server" EnableViewState="true" />
+                    <Rock:DynamicPlaceHolder ID="phAttributes" runat="server" />
                 </div>
             </div>
 
@@ -103,7 +103,7 @@
                     <Rock:RockDropDownList runat="server" ID="ddlGroupRole" DataTextField="Name" DataValueField="Id" Label="Role" Required="true" />
                 </asp:Panel>
                 <asp:Panel ID="pnlGroupMemberAttributes" runat="server" CssClass="col-md-6">
-                    <asp:PlaceHolder ID="phGroupMemberAttributes" runat="server" EnableViewState="false"></asp:PlaceHolder>
+                    <Rock:DynamicPlaceHolder ID="phGroupMemberAttributes" runat="server" />
                 </asp:Panel>
             </div>
 
@@ -115,6 +115,12 @@
             <asp:Literal ID="lGroupMemberEditPostHtml" runat="server" />
 
         </asp:Panel>
+
+        <Rock:ModalDialog ID="mdConfirmDelete" runat="server" Title="Please Confirm" SaveButtonText="Yes" OnSaveClick="mdConfirmDelete_Click">
+            <Content>
+                <asp:Literal ID="lConfirmDeleteMsg" runat="server" />
+            </Content>
+        </Rock:ModalDialog>
 
     </ContentTemplate>
 </asp:UpdatePanel>

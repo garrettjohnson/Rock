@@ -166,7 +166,12 @@ namespace Rock.Utility
             conditionalFormatting.Style.Fill.PatternType = OfficeOpenXml.Style.ExcelFillStyle.Solid;
             conditionalFormatting.Style.Fill.BackgroundColor.Color = Color.FromArgb( 240, 240, 240 );
 
-            var table = worksheet.Tables.Add( range, title.Replace( " ", "" ) );
+            var tableTitle = title.Replace( " ", "" ).Replace( Environment.NewLine, "" ).Replace( "\x0A", "" );
+            if ( !char.IsLetter( tableTitle[0] ) )
+            {
+                tableTitle = $"_{tableTitle}";
+            }
+            var table = worksheet.Tables.Add( range, tableTitle );
 
             // ensure each column in the table has a unique name
             var columnNames = worksheet.Cells[headerRows, 1, headerRows, columns].Select( a => new { OrigColumnName = a.Text, Cell = a } ).ToList();
@@ -221,7 +226,11 @@ namespace Rock.Utility
 
             worksheet.View.FreezePanes( headerRows + 1, 1 );
 
-            worksheet.Cells.AutoFitColumns();
+            // do AutoFitColumns on no more than the first 10000 rows (10000 can take 4-5 seconds, but could take several minutes if there are 100000+ rows )
+            int autoFitRows = Math.Min( rows, 10000 );
+            var autoFitRange = worksheet.Cells[headerRows, 1, autoFitRows, columns];
+
+            autoFitRange.AutoFitColumns();
 
             // TODO: add alternating highlights
 
@@ -294,6 +303,27 @@ namespace Rock.Utility
             }
 
             return defaultFormat;
+        }
+
+        /// <summary>
+        /// Updates the excel column format based on the level of detail in the data
+        /// </summary>
+        /// <param name="worksheet">The worksheet.</param>
+        /// <param name="columnCounter">The column counter.</param>
+        /// <param name="exportValue">The export value.</param>
+        public static void FinalizeColumnFormat( ExcelWorksheet worksheet, int columnCounter, object exportValue )
+        {
+            var valueFormat  = ExcelHelper.FinalColumnFormat( exportValue, null );
+            if ( valueFormat == null)
+            {
+                return;
+            }
+
+            var currentFormat = worksheet.Column( columnCounter ).Style.Numberformat.Format;
+            if ( currentFormat != valueFormat)
+            {
+                worksheet.Column( columnCounter ).Style.Numberformat.Format = valueFormat;
+            }
         }
 
         /// <summary>

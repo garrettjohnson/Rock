@@ -30,9 +30,6 @@ using Rock.Web.Cache;
 
 public class TwilioAsync : IHttpAsyncHandler
 {
-    private HttpRequest request;
-    private HttpResponse response;
-
     public IAsyncResult BeginProcessRequest(HttpContext context, AsyncCallback cb, Object extraData)
     {
         TwilioResponseAsync twilioAsync = new TwilioResponseAsync(cb, context, extraData);
@@ -70,7 +67,7 @@ class TwilioResponseAsync : IAsyncResult
     Object IAsyncResult.AsyncState { get { return _state; } }
     bool IAsyncResult.CompletedSynchronously { get { return false; } }
 
-    private const bool ENABLE_LOGGING = true;
+    private const bool ENABLE_LOGGING = false;
 
     public TwilioResponseAsync(AsyncCallback callback, HttpContext context, Object state)
     {

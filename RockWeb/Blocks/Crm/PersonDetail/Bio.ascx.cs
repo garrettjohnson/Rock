@@ -49,15 +49,20 @@ Because the contents of this setting will be rendered inside a &lt;ul&gt; elemen
     &lt;li&gt;&lt;a href='~/WorkflowEntry/4?PersonId={0}' tabindex='0'&gt;Fourth Action&lt;/a&gt;&lt;/li&gt;
 </pre>
 ", Rock.Web.UI.Controls.CodeEditorMode.Html, Rock.Web.UI.Controls.CodeEditorTheme.Rock, 200, false, "", "", 2, "Actions" )]
-    [LinkedPage( "Business Detail Page", "The page to redirect user to if a business is is requested.", false, "", "", 3 )]
-    [BooleanField( "Display Country Code", "When enabled prepends the country code to all phone numbers.", false, "", 4 )]
-    [BooleanField( "Display Middle Name", "Display the middle name of the person.", false, "", 5)]
+    [BooleanField( "Enable Impersonation", "Should the Impersonate custom action be enabled? Note: If enabled, it is only visible to users that are authorized to administrate the person.", false, "", 3 )]
+    [LinkedPage( "Impersonation Start Page", "The page to navigate to after clicking the Impersonate action.", false, "", "", 4)]
+    [LinkedPage( "Business Detail Page", "The page to redirect user to if a business is is requested.", false, "", "", 5 )]
+    [BooleanField( "Display Country Code", "When enabled prepends the country code to all phone numbers.", false, "", 6 )]
+    [BooleanField( "Display Middle Name", "Display the middle name of the person.", false, "", 7)]
     [CodeEditorField( "Custom Content", "Custom Content will be rendered after the person's demographic information <span class='tip tip-lava'></span>.",
-        Rock.Web.UI.Controls.CodeEditorMode.Lava, Rock.Web.UI.Controls.CodeEditorTheme.Rock, 200, false, "", "", 6, "CustomContent" )]
-    [BooleanField( "Allow Following", "Should people be able to follow a person by selecting the star on the person's photo?", true, "", 7)]
-    [BooleanField( "Display Tags", "Should tags be displayed?", true, "", 8 )]
-    [BooleanField( "Display Graduation", "Should the Grade/Graduation be displayed", true, "", 9 )]
-    [BooleanField( "Display Anniversary Date", "Should the Anniversary Date be displayed?", true, "", 10 )]
+        Rock.Web.UI.Controls.CodeEditorMode.Lava, Rock.Web.UI.Controls.CodeEditorTheme.Rock, 200, false, "", "", 8, "CustomContent" )]
+    [BooleanField( "Allow Following", "Should people be able to follow a person by selecting the star on the person's photo?", true, "", 9)]
+    [BooleanField( "Display Tags", "Should tags be displayed?", true, "", 10 )]
+    [BooleanField( "Display Graduation", "Should the Grade/Graduation be displayed", true, "", 11 )]
+    [BooleanField( "Display Anniversary Date", "Should the Anniversary Date be displayed?", true, "", 12 )]
+    [CategoryField( "Tag Category", "Optional category to limit the tags to. If specified all new personal tags will be added with this category.", false, 
+        "Rock.Model.Tag", "", "", false, "", "", 13 )]
+    [BooleanField( "Enable Call Origination", "Should click-to-call links be added to phone numbers.", true, "", 14 )]
     public partial class Bio : PersonBlock
     {
         #region Base Control Methods
@@ -73,6 +78,10 @@ Because the contents of this setting will be rendered inside a &lt;ul&gt; elemen
             RockPage.AddCSSLink( ResolveRockUrl( "~/Styles/fluidbox.css" ) );
             RockPage.AddScriptLink( ResolveRockUrl( "~/Scripts/imagesloaded.min.js" ) );
             RockPage.AddScriptLink( ResolveRockUrl( "~/Scripts/jquery.fluidbox.min.js" ) );
+
+            // this event gets fired after block settings are updated. it's nice to repaint the screen if these settings would alter it
+            this.BlockUpdated += Block_BlockUpdated;
+            this.AddConfigurationUpdateTrigger( pnlContent );
 
             if ( Person != null )
             {
@@ -112,6 +121,17 @@ Because the contents of this setting will be rendered inside a &lt;ul&gt; elemen
                 }
 
                 lbEditPerson.Visible = IsUserAuthorized( Rock.Security.Authorization.EDIT );
+
+                // only show if the Impersonation button if the feature is enabled, and the current user is authorized to Administrate the person
+                bool enableImpersonation = this.GetAttributeValue( "EnableImpersonation" ).AsBoolean();
+                lbImpersonate.Visible = false;
+                if ( enableImpersonation )
+                {
+                    if ( Person.IsAuthorized( Rock.Security.Authorization.ADMINISTRATE, this.CurrentPerson ) )
+                    {
+                        lbImpersonate.Visible = true;
+                    }
+                }
             }
         }
 
@@ -145,6 +165,8 @@ Because the contents of this setting will be rendered inside a &lt;ul&gt; elemen
                         FollowingsHelper.SetFollowing( Person.PrimaryAlias, pnlFollow, this.CurrentPerson );
                     }
 
+                    hlVCard.NavigateUrl = ResolveRockUrl( string.Format( "~/GetVCard.ashx?Person={0}", Person.Id ) );
+
                     var socialCategoryGuid = Rock.SystemGuid.Category.PERSON_ATTRIBUTES_SOCIAL.AsGuid();
                     if ( !socialCategoryGuid.IsEmpty() )
                     {
@@ -168,7 +190,13 @@ Because the contents of this setting will be rendered inside a &lt;ul&gt; elemen
 
                     if ( Person.BirthDate.HasValue )
                     {
-                        lAge.Text = string.Format("{0}<small>({1})</small><br/>", Person.FormatAge(), (Person.BirthYear.HasValue && Person.BirthYear != DateTime.MinValue.Year) ? Person.BirthDate.Value.ToShortDateString() : Person.BirthDate.Value.ToMonthDayString());
+                        var formattedAge = Person.FormatAge();
+                        if ( formattedAge.IsNotNullOrWhitespace() )
+                        {
+                            formattedAge += " old";
+                        }
+
+                        lAge.Text = string.Format( "{0} <small>({1})</small><br/>", formattedAge, ( Person.BirthYear.HasValue && Person.BirthYear != DateTime.MinValue.Year ) ? Person.BirthDate.Value.ToShortDateString() : Person.BirthDate.Value.ToMonthDayString() );
                     }
 
                     lGender.Text = Person.Gender.ToString();
@@ -204,6 +232,7 @@ Because the contents of this setting will be rendered inside a &lt;ul&gt; elemen
                         taglPersonTags.Visible = true;
                         taglPersonTags.EntityTypeId = Person.TypeId;
                         taglPersonTags.EntityGuid = Person.Guid;
+                        taglPersonTags.CategoryGuid = GetAttributeValue( "TagCategory" ).AsGuidOrNull();
                         taglPersonTags.GetTagValues( CurrentPersonId );
                     }
                     else
@@ -274,6 +303,21 @@ Because the contents of this setting will be rendered inside a &lt;ul&gt; elemen
             }
         }
 
+        /// <summary>
+        /// Handles the BlockUpdated event of the control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
+        protected void Block_BlockUpdated( object sender, EventArgs e )
+        {
+            // reload the page if block settings where changed
+            Response.Redirect( Request.RawUrl, false );
+            Context.ApplicationInstance.CompleteRequest();
+        }
+
+        /// <summary>
+        /// Sets the name of the person.
+        /// </summary>
         private void SetPersonName()
         {
             // Check if this record represents a Business.
@@ -303,7 +347,16 @@ Because the contents of this setting will be rendered inside a &lt;ul&gt; elemen
                 {
                     nameText = string.Format( "<span class='first-word'>{0}</span> <span class='lastname'>{1}</span>", Person.NickName, Person.LastName );
                 }
-                
+
+                // Prefix with Title if they have a Title with IsFormal=True
+                if ( Person.TitleValueId.HasValue )
+                {
+                    var personTitleValue = DefinedValueCache.Read( Person.TitleValueId.Value );
+                    if ( personTitleValue != null && personTitleValue.GetAttributeValue( "IsFormal" ).AsBoolean() )
+                    {
+                        nameText = string.Format( "<span class='title'>{0}</span> ", personTitleValue.Value ) + nameText;
+                    }
+                }
 
                 // Add First Name if different from NickName.
                 if ( Person.NickName != Person.FirstName )
@@ -365,6 +418,36 @@ Because the contents of this setting will be rendered inside a &lt;ul&gt; elemen
             }
         }
 
+        /// <summary>
+        /// Handles the Click event of the lbImpersonate control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
+        protected void lbImpersonate_Click( object sender, EventArgs e )
+        {
+            if ( Person != null )
+            {
+                if ( Person.IsAuthorized( Rock.Security.Authorization.ADMINISTRATE, this.CurrentPerson ) )
+                {
+                    var impersonationToken = this.Person.GetImpersonationToken( RockDateTime.Now.AddMinutes( 5 ), 1, null );
+
+                    // store the current user in Session["ImpersonatedByUser"] so that we can log back in as them from the Admin Bar
+                    Session["ImpersonatedByUser"] = this.CurrentUser;
+
+                    var qryParams = new Dictionary<string, string>();
+                    qryParams.Add( "rckipid", impersonationToken );
+                    if ( !string.IsNullOrEmpty( this.GetAttributeValue( "ImpersonationStartPage" ) ) )
+                    {
+                        NavigateToLinkedPage( "ImpersonationStartPage", qryParams );
+                    }
+                    else
+                    {
+                        NavigateToCurrentPageReference( qryParams );
+                    }
+                }
+            }
+        }
+
         #endregion
 
         #region Methods
@@ -377,9 +460,10 @@ Because the contents of this setting will be rendered inside a &lt;ul&gt; elemen
         /// <param name="number">The number.</param>
         /// <param name="phoneNumberTypeId">The phone number type identifier.</param>
         /// <returns></returns>
-        protected string
-        FormatPhoneNumber( bool unlisted, object countryCode, object number, int phoneNumberTypeId, bool smsEnabled = false )
+        protected string FormatPhoneNumber( bool unlisted, object countryCode, object number, int phoneNumberTypeId, bool smsEnabled = false )
         {
+            var originationEnabled = GetAttributeValue( "EnableCallOrigination" ).AsBoolean();
+
             string formattedNumber = "Unlisted";
 
             string cc = countryCode as string ?? string.Empty;
@@ -397,23 +481,35 @@ Because the contents of this setting will be rendered inside a &lt;ul&gt; elemen
                 }
             }
 
-            // if the page is being loaded locally then add the tel:// link
-            if ( RockPage.IsMobileRequest )
-            {
-                formattedNumber = string.Format( "<a href=\"tel://{0}\">{1}</a>", n, formattedNumber );
-            }
-
             var phoneType = DefinedValueCache.Read( phoneNumberTypeId );
             if ( phoneType != null )
             {
+                string phoneMarkup = formattedNumber;
+
+                if ( originationEnabled )
+                {
+                    var pbxComponent = Rock.Pbx.PbxContainer.GetAllowedActiveComponentWithOriginationSupport( CurrentPerson );
+
+                    if ( pbxComponent != null )
+                    {
+                        var jsScript = string.Format( "javascript: Rock.controls.pbx.originate('{0}', '{1}', '{2}','{3}','{4}');", CurrentPerson.Guid, number.ToString(), CurrentPerson.FullName, Person.FullName, formattedNumber );
+                        phoneMarkup = string.Format( "<a class='originate-call js-originate-call' href=\"{0}\">{1}</a>", jsScript, formattedNumber );
+                    }
+                    else if ( RockPage.IsMobileRequest ) // if the page is being loaded locally then add the tel:// link
+                    {
+                        formattedNumber = string.Format( "<a href=\"tel://{0}\">{1}</a>", n, formattedNumber );
+                    }
+                }                
+
                 if ( smsEnabled )
                 {
-                    formattedNumber = string.Format( "{0} <small>{1} <i class='fa fa-comments'></i></small>", formattedNumber, phoneType.Value );
+                    formattedNumber = string.Format( "{0} <small>{1} <i class='fa fa-comments'></i></small>", phoneMarkup, phoneType.Value );
                 }
                 else
                 {
-                    formattedNumber = string.Format( "{0} <small>{1}</small>", formattedNumber, phoneType.Value );
+                    formattedNumber = string.Format( "{0} <small>{1}</small>", phoneMarkup, phoneType.Value );
                 }
+
             }
 
             return formattedNumber;

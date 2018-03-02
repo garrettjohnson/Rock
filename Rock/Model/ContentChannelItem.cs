@@ -32,6 +32,7 @@ namespace Rock.Model
     /// <summary>
     /// 
     /// </summary>
+    [RockDomain( "CMS" )]
     [Table( "ContentChannelItem")]
     [DataContract]
     public partial class ContentChannelItem : Model<ContentChannelItem>, IOrdered, IRockIndexable
@@ -181,6 +182,7 @@ namespace Rock.Model
         /// <value>
         /// The approved by person alias.
         /// </value>
+        [LavaInclude]
         public virtual PersonAlias ApprovedByPersonAlias { get; set; }
 
         /// <summary>
@@ -395,8 +397,20 @@ namespace Rock.Model
                 ChildItems.Clear();
                 ParentItems.Clear();
             }
+
+            base.PreSaveChanges( dbContext, state );
         }
 
+        /// <summary>
+        /// Returns a <see cref="System.String" /> that represents this instance.
+        /// </summary>
+        /// <returns>
+        /// A <see cref="System.String" /> that represents this instance.
+        /// </returns>
+        public override string ToString()
+        {
+            return this.Title;
+        }
 
         #endregion
     }

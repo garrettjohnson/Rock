@@ -82,8 +82,8 @@ namespace RockWeb.Blocks.CheckIn
         {
             ScheduleService scheduleService = new ScheduleService( new RockContext() );
 
-            // limit Schedules to ones that have a CheckInStartOffsetMinutes
-            var scheduleQry = scheduleService.Queryable().Where( a => a.CheckInStartOffsetMinutes != null );
+            // limit Schedules to ones that are Active and have a CheckInStartOffsetMinutes
+            var scheduleQry = scheduleService.Queryable().Where( a => a.IsActive && a.CheckInStartOffsetMinutes != null );
 
             // limit Schedules to the Category from the Filter
             int scheduleCategoryId = pCategory.SelectedValueAsInt() ?? Rock.Constants.All.Id;
@@ -110,7 +110,8 @@ namespace RockWeb.Blocks.CheckIn
             {
                 string dataFieldName = string.Format( "scheduleField_{0}", item.Id );
 
-                CheckBoxEditableField field = new CheckBoxEditableField { HeaderText = item.Name, DataField = dataFieldName };
+                CheckBoxEditableField field = new CheckBoxEditableField { HeaderText = item.Name + "<br /><a href='#' style='display: inline' class='fa fa-square-o js-sched-select-all'></a>", DataField = dataFieldName };
+                field.HeaderStyle.HorizontalAlign = HorizontalAlign.Center;
                 gGroupLocationSchedule.Columns.Add( field );
             }
 

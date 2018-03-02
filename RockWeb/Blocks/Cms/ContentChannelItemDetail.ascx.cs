@@ -176,7 +176,7 @@ namespace RockWeb.Blocks.Cms
                     var contentChannel = GetAttributeValue("ContentChannel").AsGuid();
                     ShowDetail(PageParameter("contentItemId").AsInteger(), new ContentChannelService(new RockContext()).Get(GetAttributeValue("ContentChannel").AsGuid()).Id);
                 }
-                
+
             }
             else
             {
@@ -185,7 +185,7 @@ namespace RockWeb.Blocks.Cms
                 item.LoadAttributes();
 
                 phAttributes.Controls.Clear();
-                Rock.Attribute.Helper.AddEditControls( item, phAttributes, false, BlockValidationGroup );
+                Rock.Attribute.Helper.AddEditControls( item, phAttributes, false, BlockValidationGroup, 2 );
 
                 ShowDialog();
             }
@@ -302,6 +302,12 @@ namespace RockWeb.Blocks.Cms
                 {
                     rockContext.SaveChanges();
                     contentItem.SaveAttributeValues( rockContext );
+
+                    if ( contentItem.ContentChannel.IsTaggingEnabled )
+                    {
+                        taglTags.EntityGuid = contentItem.Guid;
+                        taglTags.SaveTagValues( CurrentPersonAlias );
+                    }
 
                     int? eventItemOccurrenceId = PageParameter( "EventItemOccurrenceId" ).AsIntegerOrNull();
                     if ( eventItemOccurrenceId.HasValue )
@@ -694,6 +700,28 @@ namespace RockWeb.Blocks.Cms
 
             ContentChannelItem contentItem = GetContentItem();
 
+            if ( contentItem == null )
+            {
+                // this block requires a valid ContentChannel in order to know which channel the ContentChannelItem belongs to, so if ContentChannel wasn't specified, don't show this block
+                this.Visible = false;
+                return;
+            }
+
+            if ( contentItem.ContentChannel.IsTaggingEnabled )
+            {
+                taglTags.EntityTypeId = EntityTypeCache.Read( typeof( ContentChannelItem ) ).Id;
+                taglTags.CategoryGuid = ( contentItem.ContentChannel != null && contentItem.ContentChannel.ItemTagCategory != null ) ?
+                     contentItem.ContentChannel.ItemTagCategory.Guid : (Guid?)null;
+                taglTags.EntityGuid = contentItem.Guid;
+                taglTags.DelaySave = true;
+                taglTags.GetTagValues( CurrentPersonId );
+                rcwTags.Visible = true;
+            }
+            else
+            {
+                rcwTags.Visible = false;
+            }
+
             pdAuditDetails.SetEntity( contentItem, ResolveRockUrl( "~" ) );
 
             if ( contentItem != null &&
@@ -727,7 +755,7 @@ namespace RockWeb.Blocks.Cms
 
                 hlContentChannel.Text = contentItem.ContentChannel.Name;
 
-                hlStatus.Visible = contentItem.ContentChannel.RequiresApproval;
+                hlStatus.Visible = contentItem.ContentChannel.RequiresApproval && !contentItem.ContentChannelType.DisableStatus;
 
                 hlStatus.Text = contentItem.Status.ConvertToString();
 
@@ -751,7 +779,6 @@ namespace RockWeb.Blocks.Cms
                         contentItem.ApprovedDateTime.Value.ToShortTimeString() );
                 }
                 hlStatus.ToolTip = statusDetail.ToString();
-                hlStatus.Visible = !contentItem.ContentChannelType.DisableStatus;
 
                 tbTitle.Text = contentItem.Title;
 

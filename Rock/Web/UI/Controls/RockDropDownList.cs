@@ -307,29 +307,10 @@ namespace Rock.Web.UI.Controls
             {
                 ( (WebControl)this ).AddCssClass( "chosen-select" );
 
-                var script = new System.Text.StringBuilder();
-                script.AppendFormat( @"
-    $('#{0}').chosen({{
-        width: '100%',
-        allow_single_deselect: true,
-        placeholder_text_multiple: ' ',
-        placeholder_text_single: ' '
-    }});
-", this.ClientID );
-
                 if ( DisplayEnhancedAsAbsolute )
                 {
-                    script.AppendFormat( @"
-    $( '#{0}').on('chosen:showing_dropdown', function( evt, params ) {{
-        $(this).next('.chosen-container').find('.chosen-drop').css('position','relative');
-    }});
-    $('#{0}').on('chosen:hiding_dropdown', function( evt, params ) {{
-        $(this).next('.chosen-container').find('.chosen-drop').css('position','absolute');
-    }});
-", this.ClientID );
+                    ( ( WebControl ) this ).AddCssClass( "chosen-select-absolute" );
                 }
-
-                ScriptManager.RegisterStartupScript( this, this.GetType(), "ChosenScript_" + this.ClientID, script.ToString(), true );
             }
 
             base.RenderControl( writer );
@@ -384,16 +365,6 @@ namespace Rock.Web.UI.Controls
                     }
                 }
             }
-        }
-
-        /// <summary>
-        /// Handles the <see cref="E:System.Web.UI.Control.Init" /> event.
-        /// </summary>
-        /// <param name="e">An <see cref="T:System.EventArgs" /> object that contains the event data.</param>
-        protected override void OnInit( EventArgs e )
-        {
-            base.OnInit( e );
-            RockPage.AddScriptLink( this.Page, "~/Scripts/chosen.jquery.min.js" );
         }
 
         /// <summary>

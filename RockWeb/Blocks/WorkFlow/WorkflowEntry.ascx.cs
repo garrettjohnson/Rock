@@ -49,10 +49,9 @@ namespace RockWeb.Blocks.WorkFlow
 
         private RockContext _rockContext = null;
         private WorkflowService _workflowService = null;
-        private WorkflowTypeService _workflowTypeService = null;
 
-        private WorkflowType _workflowType = null;
-        private WorkflowActionType _actionType = null;
+        private WorkflowTypeCache _workflowType = null;
+        private WorkflowActionTypeCache _actionType = null;
         private Workflow _workflow = null;
         private WorkflowActivity _activity = null;
         private WorkflowAction _action = null;
@@ -345,9 +344,12 @@ namespace RockWeb.Blocks.WorkFlow
 
                     // Loop through all the query string parameters and try to set any workflow
                     // attributes that might have the same key
-                    foreach ( string key in Request.QueryString.AllKeys )
+                    foreach ( var param in RockPage.PageParameters() )
                     {
-                        _workflow.SetAttributeValue( key, Request.QueryString[key] );
+                        if ( param.Value != null && param.Value.ToString().IsNotNullOrWhitespace() )
+                        {
+                            _workflow.SetAttributeValue( param.Key, param.Value.ToString() );
+                        }
                     }
 
                     List<string> errorMessages;
@@ -380,13 +382,13 @@ namespace RockWeb.Blocks.WorkFlow
                 {
                     foreach ( var activity in _workflow.ActiveActivities )
                     {
-                        _action = activity.Actions.Where( a => a.ActionTypeId == ActionTypeId.Value ).FirstOrDefault();
+                        _action = activity.ActiveActions.Where( a => a.ActionTypeId == ActionTypeId.Value ).FirstOrDefault();
                         if ( _action != null )
                         {
                             _activity = activity;
                             _activity.LoadAttributes();
 
-                            _actionType = _action.ActionType;
+                            _actionType = _action.ActionTypeCache;
                             ActionTypeId = _actionType.Id;
                             return true; 
                         }
@@ -395,9 +397,11 @@ namespace RockWeb.Blocks.WorkFlow
 
                 // Find first active action form
                 int personId = CurrentPerson != null ? CurrentPerson.Id : 0;
+                int? actionId = PageParameter( "ActionId" ).AsIntegerOrNull();
                 foreach ( var activity in _workflow.Activities
                     .Where( a =>
                         a.IsActive &&
+                        ( !actionId.HasValue || a.Actions.Any( ac => ac.Id == actionId.Value ) ) &&
                         (
                             ( canEdit ) ||
                             ( !a.AssignedGroupId.HasValue && !a.AssignedPersonAliasId.HasValue ) ||
@@ -405,19 +409,21 @@ namespace RockWeb.Blocks.WorkFlow
                             ( a.AssignedGroup != null && a.AssignedGroup.Members.Any( m => m.PersonId == personId ) )
                         )
                     )
-                    .OrderBy( a => a.ActivityType.Order ) )
+                    .ToList()
+                    .OrderBy( a => a.ActivityTypeCache.Order ) )
                 {
-                    if ( canEdit || ( activity.ActivityType.IsAuthorized( Authorization.VIEW, CurrentPerson ) ) )
+                    if ( canEdit || ( activity.ActivityTypeCache.IsAuthorized( Authorization.VIEW, CurrentPerson ) ) )
                     {
-                        foreach ( var action in activity.ActiveActions )
+                        foreach ( var action in activity.ActiveActions
+                            .Where( a => ( !actionId.HasValue || a.Id == actionId.Value ) ) )
                         {
-                            if ( action.ActionType.WorkflowForm != null && action.IsCriteriaValid )
+                            if ( action.ActionTypeCache.WorkflowForm != null && action.IsCriteriaValid )
                             {
                                 _activity = activity;
                                 _activity.LoadAttributes();
 
                                 _action = action;
-                                _actionType = _action.ActionType;
+                                _actionType = _action.ActionTypeCache;
                                 ActionTypeId = _actionType.Id;
                                 return true;
                             }
@@ -474,11 +480,6 @@ namespace RockWeb.Blocks.WorkFlow
                 _workflowService = new WorkflowService( _rockContext );
             }
 
-            if ( _workflowTypeService == null )
-            {
-                _workflowTypeService = new WorkflowTypeService( _rockContext );
-            }
-
             // Get the workflow type id (initial page request)
             if ( !WorkflowTypeId.HasValue )
             {
@@ -486,7 +487,7 @@ namespace RockWeb.Blocks.WorkFlow
                 Guid workflowTypeguid = GetAttributeValue( "WorkflowType" ).AsGuid();
                 if ( !workflowTypeguid.IsEmpty() )
                 {
-                    _workflowType = _workflowTypeService.Get( workflowTypeguid );
+                    _workflowType = WorkflowTypeCache.Read( workflowTypeguid );
                 }
 
                 // If an attribute value was not provided, check for query/route value
@@ -505,7 +506,7 @@ namespace RockWeb.Blocks.WorkFlow
             // Get the workflow type 
             if ( _workflowType == null && WorkflowTypeId.HasValue )
             {
-                _workflowType = _workflowTypeService.Get( WorkflowTypeId.Value );
+                _workflowType = WorkflowTypeCache.Read( WorkflowTypeId.Value );
             }
         }
 
@@ -575,11 +576,11 @@ namespace RockWeb.Blocks.WorkFlow
                         // get formatted value 
                         if ( attribute.FieldType.Class == typeof( Rock.Field.Types.ImageFieldType ).FullName )
                         {
-                            formattedValue = attribute.FieldType.Field.FormatValueAsHtml( phAttributes, value, attribute.QualifierValues, true );
+                            formattedValue = attribute.FieldType.Field.FormatValueAsHtml( phAttributes, attribute.EntityTypeId, _activity.Id, value, attribute.QualifierValues, true );
                         }
                         else
                         {
-                            formattedValue = field.FormatValueAsHtml( phAttributes, value, attribute.QualifierValues );
+                            formattedValue = field.FormatValueAsHtml( phAttributes, attribute.EntityTypeId, _activity.Id, value, attribute.QualifierValues );
                         }
 
                         if ( formAttribute.HideLabel )
@@ -760,7 +761,7 @@ namespace RockWeb.Blocks.WorkFlow
                 _action.FormAction = formAction;
                 _action.AddLogEntry( "Form Action Selected: " + _action.FormAction );
 
-                if (_action.ActionType.IsActivityCompletedOnSuccess)
+                if (_action.ActionTypeCache.IsActivityCompletedOnSuccess)
                 {
                     _action.Activity.MarkComplete();
                 }
@@ -813,7 +814,14 @@ namespace RockWeb.Blocks.WorkFlow
 
                     if ( HydrateObjects() && _action != null && _action.Id != previousActionId )
                     {
-                        BuildForm( true );
+                        // If we are already being directed (presumably from the Redirect Action), don't redirect again.
+                        if (!Response.IsRequestBeingRedirected)
+                        {
+                            var cb = CurrentPageReference;
+                            cb.Parameters.AddOrReplace( "WorkflowId", _workflow.Id.ToString() );
+                            Response.Redirect( cb.BuildUrl(), false );
+                            Context.ApplicationInstance.CompleteRequest();
+                        }
                     }
                     else
                     {

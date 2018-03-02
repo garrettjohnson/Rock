@@ -151,10 +151,14 @@ namespace Rock.Model
                 }
 
                 // Write ExceptionLog record to database.
-                var rockContext = new Rock.Data.RockContext();
-                var exceptionLogService = new ExceptionLogService( rockContext );
-                exceptionLogService.Add( exceptionLog );
-                rockContext.SaveChanges();
+                using ( var rockContext = new Rock.Data.RockContext() )
+                {
+                    var exceptionLogService = new ExceptionLogService( rockContext );
+                    exceptionLogService.Add( exceptionLog );
+
+                    // call SaveChanges with 'disablePrePostProcessing=true' just in case the pre/post processing would also cause exceptions
+                    rockContext.SaveChanges( true );
+                }
 
                 // Recurse if inner exception is found
                 if ( exceptionLog.HasInnerException.GetValueOrDefault( false ) )
@@ -162,7 +166,7 @@ namespace Rock.Model
                     LogExceptions( ex.InnerException, exceptionLog, false );
                 }
 
-                if (ex is AggregateException)
+                if ( ex is AggregateException )
                 {
                     // if an AggregateException occurs, log the exceptions individually
                     var aggregateException = ( ex as AggregateException );
@@ -171,6 +175,7 @@ namespace Rock.Model
                         LogExceptions( innerException, exceptionLog, false );
                     }
                 }
+
             }
             catch ( Exception )
             {
@@ -189,7 +194,7 @@ namespace Rock.Model
                     string when = RockDateTime.Now.ToString();
                     while ( ex != null )
                     {
-                        File.AppendAllText( filePath, string.Format( "{0},{1},\"{2}\"\r\n", when, ex.GetType(), ex.Message ) );
+                        File.AppendAllText( filePath, string.Format( "{0},{1},\"{2}\",\"{3}\"\r\n", when, ex.GetType(), ex.Message, ex.StackTrace ) );
                         ex = ex.InnerException;
                     }
                 }
