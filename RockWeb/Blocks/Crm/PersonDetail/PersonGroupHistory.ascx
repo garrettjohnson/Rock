@@ -84,7 +84,7 @@
                 if (groupTypeIds && groupTypeIds != '') {
                     restUrl += '&groupTypeIds=' + groupTypeIds
                 }
-
+                console.log(restUrl);
                 $.ajax({
                     url: restUrl,
                     dataType: 'json',
@@ -92,7 +92,7 @@
                 }).done(function (data) {
                     var jsonString = JSON.stringify(data, null, 2);
                     $('#<%=divRawResponse.ClientID%>').html(jsonString);
-                    });
+                });
             });
 
 

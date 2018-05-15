@@ -14,6 +14,7 @@
 @import "_variables.less";
 @import "_variable-overrides.less";
 @import "_root.less";
+
 /*
   Rock Theme Styles
   1. HTML Overrides
@@ -22,7 +23,6 @@
   4. Theme Styling
   5. Components
 */
-
 
 /*#region
 // 1. HTML Overrides         */
@@ -63,14 +63,13 @@ input[type="text"],
 textarea,
 .form-control {
   box-shadow: none;
-  transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out;
+  transition: @input-focus-transition;
 
   &:focus {
-    border: 1px solid @brand-primary;
-    box-shadow: 0 0 0 3px rgba(red(@brand-primary), green(@brand-primary), blue(@brand-primary), .6);
+    border: 1px solid @input-border-focus;
+    box-shadow: @input-focus-box-shadow;
   }
 }
-
 
 // text selection color
 ::selection {
@@ -90,6 +89,66 @@ textarea,
 // 2. Bootstrap Overrides    */
 // -------------------------
 
+.tooltip {
+  &.fade{
+    animation-delay: 300ms;
+    animation-duration: 0.267s;
+    animation-timing-function: cubic-bezier(0.1, 0.25, 0.75, 0.9);
+    animation-name: css-1;
+    .transition(none);
+  }
+
+  &.top {
+    margin-bottom: 1px;
+    .tooltip-arrow {
+      bottom: 1px;
+      border-width: 0 1px 1px 0;
+    }
+  }
+
+  &.bottom {
+    margin-top: 1px;
+    .tooltip-arrow {
+      top: 1px;
+      border-width: 1px 0 0 1px;
+    }
+  }
+}
+
+
+.tooltip-arrow {
+  border: 1px solid @ui-4;
+  transform: rotate(45deg);
+  background: #fff;
+  width: 10px;
+  height: 10px;
+}
+
+.tooltip-inner {
+  .box-shadow(@shadow-overlay);
+  padding: (@padding-base-horizontal / 2);
+  text-align: left;
+  border: 1px solid @ui-4;
+}
+
+.close {
+  opacity: .5;
+  &:focus,
+  &:hover {
+    opacity: .75;
+  }
+}
+
+@media (max-width: @screen-sm-max) {
+  .form-well {
+    padding: @panel-body-padding;
+    margin: 0 -(@panel-body-padding);
+    background: #fff;
+    border: 0;
+    .box-shadow(none);
+  }
+}
+
 .alert {
   border-width: 0;
   border-top-width: 3px;
@@ -100,10 +159,6 @@ textarea,
   box-shadow: none;
 }
 
-.input-group-addon,
-.form-control {
-  height: 38px;
-}
 .has-error .form-control,
 .has-error .input-group-addon {
   box-shadow: 0;
@@ -130,49 +185,90 @@ textarea,
   border-radius: 0; // labels always have curves
 }
 
+.grid-filter {
+  padding: 0;
+  border: 0;
+
+  .btn-link,
+  .btn-link i {
+    color: @ui-5;
+    background: @panel-heading-bg;
+    text-decoration: none;
+    &:hover,
+    &:hover i{
+      color: @link-color;
+    }
+  }
+}
+
 .grid .table > tbody > tr > td,
 .grid .table > tbody > tr > th,
 .grid .table > thead > tr > td,
 .grid .table > thead > tr > th {
-  padding: 18px 12px;
+  padding: 18px 17px 18px 12px;
   border-width: @table-column-border-width;
   border-top-width: 1px;
+}
+
+.grid .table > thead > tr > td,
+.grid .table > thead > tr > th {
+  padding: 18px 0 18px 12px;
+  vertical-align: middle;
+  &:last-child {
+    border-right: 1px solid @table-border-color;
+  }
+}
+
+.grid .table > thead > tr.grid-header-bold > th {
+  padding: 18px 17px 18px 12px;
 }
 
 .grid .table > tbody > tr > td {
   &.grid-columnreorder {
     padding-top: 18px;
   }
+  &.grid-row-header {
+    font-weight: bold;
+    border-right: 1px solid @table-border-color;
+  }
+
+  &.grid-columncommand {
+    vertical-align: middle;
+    min-width: 0;
+    padding: 0;
+    width: 30px;
+  }
+
+  &:last-child {
+    border-right: 1px solid @table-border-color;
+  }
 }
 
 .grid .table > tfoot {
-  border-top: 1px solid @table-border-color;
+  border-top: 1px solid @ui-4;
   > tr > td,
   > tr > th {
     color: @text-color;
+    border-top: 1px solid @ui-4;
     background: @panel-bg;
   }
 }
 
-.grid .table > tbody > tr > td.grid-columncommand {
-  padding-top: 14px;
-  padding-bottom: 0;
-}
 
-.grid-columncommand .btn {
-  width: 33px;
-  padding: 5px 10px 5px 7px;
-}
-
-.grid-columncommand .btn.fa-clone {
-  width: 33px;
-  padding: 8px 8px 8px 7px;
+.grid-columncommand {
+  .btn {
+    width: 33px;
+    padding: 5px 7px;
+    &.fa-clone {
+      width: 33px;
+      padding: 8px 8px 8px 7px;
+    }
+  }
 }
 
 .btn.active,
 .btn:active { // removes the shadow from the toggles
-  -webkit-box-shadow: none;
-  box-shadow: none;
+  .box-shadow(none);
 }
 
 .control-label {
@@ -184,6 +280,17 @@ textarea,
 /*#region
 // 3. Rock Overrides         */
 // -------------------------
+
+.rollover-item {
+  > a {
+    color: @ui-5;
+
+    &:hover,
+    &:focus {
+      color: @link-color;
+    }
+  }
+}
 
 .modal {
   .box-shadow(0 12px 24px 0 rgba(0, 0, 0, 0.1));
@@ -236,14 +343,18 @@ textarea,
 }
 
 .panel {
+  .box-shadow(@shadow-raised);
+}
+
+.group-member-list .panel,
+.panel-widget,
+.panel-drawer {
   .box-shadow(none);
 }
 
-.panel-block {
 
+.panel-block {
   > .panel-heading {
-    padding: 15px;
-    font-size: 1.125em;
     border-bottom: 1px solid @panel-border;
   }
 }
@@ -271,22 +382,15 @@ textarea,
 td.grid-actions {
   padding: 0 !important;
   font-size: 1em;
-
-  a.btn {
-    opacity: .7;
-
-    &:hover {
-      opacity: 1;
-    }
-  }
+  background-color: #fff;
 }
 
 .grid-select-field {
-  width: 80px;
+  width: @custom-control-indicator-size;
 
   .checkbox:last-child,
   .radio:last-child {
-    margin-left: 8px;
+    margin: 0;
   }
 
   .checkbox input[type="checkbox"] + span.label-text::before,
@@ -297,9 +401,16 @@ td.grid-actions {
 
 .grid-actions {
   .btn {
+    padding: 0 4px;
     font-size: 1.125em;
+    color: @ui-5;
     background-color: transparent;
     border: 0;
+    transition: color 250ms;
+
+    &:hover{
+      color: @link-color;
+    }
   }
 }
 
@@ -375,8 +486,7 @@ td.grid-actions {
       background-image: url("../../../Assets/Images/rock-logo-circle-white.svg");
       background-repeat: no-repeat;
       background-position: center center;
-      background-size: calc(@navbarside-width * .525);
-      opacity: .7;
+      background-size: (@navbarside-width * .525);
     }
 
     &:hover {
@@ -390,7 +500,7 @@ td.grid-actions {
   }
 
   // Bookmarks
-  // 
+  //
   // .bookmarks {
   //   margin: 0;
 
@@ -443,7 +553,7 @@ td.grid-actions {
     }
 
     .twitter-typeahead {
-      margin-right: 80px
+      margin-right: 80px;
     }
 
     .smartsearch-type {
@@ -549,7 +659,7 @@ td.grid-actions {
           background-color: @brand-color;
           background-color: var(--brand-color);
 
-          &>li>a{
+          & > li > a{
             color: @navbartop-color;
             color: var(--navbartop-color);
           }
@@ -603,9 +713,9 @@ td.grid-actions {
 #content-wrapper {
   position: relative;
 
-  >.row {
-    margin-left:0;
-    margin-right:0;
+  > .row {
+    margin-right: 0;
+    margin-left: 0;
   }
 }
 
@@ -750,7 +860,7 @@ td.grid-actions {
           width: 10px;
           background-color: transparent;
         }
-  
+
         &::-webkit-scrollbar-thumb {
           width: 10px;
           background-color: rgba(0,0,0, .2);
@@ -811,7 +921,7 @@ body.navbar-side-close {
     min-height: 600px;
     padding: 15px;
 
-    @media (min-width: @screen-md-min) {
+    @media (max-width: @screen-md-max) {
       padding: 0;
     }
   }
@@ -844,12 +954,11 @@ body.navbar-side-close {
         display: none;
       }
 
-      > li+li:before {
+      > li + li::before {
         padding: 0 6px 0 7px;
       }
     }
   }
-
 
 
   @media (min-width: @screen-md-min) {
@@ -876,8 +985,18 @@ body.navbar-side-close {
 // splash screen
 #splash {
   #content {
-    width: 85%;
+    max-width: 380px;
     margin: 70px auto 0;
+    @media (max-width: @screen-xs-max) {
+      max-width: 100%;
+      padding: 0 @padding-base-horizontal;
+    }
+
+    .btn {
+      display: block;
+      width: 100%;
+      margin: 18px 0 0;
+    }
   }
 
   #logo {
@@ -989,6 +1108,12 @@ body.navbar-side-close {
   }
 }
 
+// Fix to Show Checkbox in Summernote Modals
+.modal-body > .checkbox label input[type="checkbox"] {
+  z-index: 0;
+  opacity: 1;
+}
+
 .radio-inline,
 .checkbox-inline {
   padding-left: 30px;
@@ -1092,7 +1217,6 @@ body.navbar-side-close {
 }
 
 
-
 .note-editor.note-frame {
   margin-bottom: 0;
   border: 0;
@@ -1107,12 +1231,12 @@ body.navbar-side-close {
 
 .note-btn {
   padding: 5px 10px 7px;
-  background:#fff;
+  background: #fff;
   border: 0;
 
   &:hover,
   &:focus {
-    background:#fff;
+    background: #fff;
   }
 
   &:active,
@@ -1132,7 +1256,7 @@ body.navbar-side-close {
 //   font-size: 14px
 // }
 
-.note-editor .note-toolbar>.btn-group {
+.note-editor .note-toolbar > .btn-group {
   margin-top: 0;
 }
 
@@ -1158,6 +1282,48 @@ body.navbar-side-close {
 // .note-editor .note-editing-area .note-editable {
 //   color: #555
 // }
+
+// .panel-body .actions {
+//   border-top: 2px solid #3d70b2;
+//   padding: 16px 16px 0 16px;
+//   margin: 0 -24px;
+// }
+
+.fade {
+  animation-name: css-1, css-11;
+  animation-duration: 0.167s;
+  animation-timing-function: cubic-bezier(0.1, 0.25, 0.75, .9);
+  animation-fill-mode: both;
+}
+
+.picker-menu {
+  animation-name: css-1, css-13;
+  animation-duration: 0.367s;
+  animation-timing-function: cubic-bezier(0.1, 0.9, 0.2, 1);
+  animation-fill-mode: both;
+}
+
+@keyframes css-1 {
+  0% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes css-13 {
+
+  0% {
+    transform: translate3d(0px, -10px, 0px);
+  }
+  
+  100% {
+    transform: translate3d(0px, 0px, 0px);
+  }
+
+}
 
 
 

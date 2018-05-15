@@ -3885,9 +3885,18 @@ $('#{this.ClientID} .grid-select-cell').on( 'click', function (event) {{
         /// <param name="container">The <see cref="T:System.Web.UI.Control"/> object to contain the instances of controls from the inline template.</param>
         public void InstantiateIn( Control container )
         {
+            HtmlGenericControl paginationContainer = new HtmlGenericControl( "div" );
+            paginationContainer.Attributes.Add( "class", "pagination-left" );
+            container.Controls.Add( paginationContainer );
+            
+            // HtmlGenericControl paginationText = new HtmlGenericControl("span");
+            // paginationText.AddCssClass( "pagination-text" );
+            // paginationText.InnerHtml = "Items per page:";
+            // paginationContainer.Controls.Add( paginationText );
+
             HtmlGenericControl ulSizeOptions = new HtmlGenericControl( "ul" );
             ulSizeOptions.AddCssClass( "grid-pagesize pagination pagination-sm" );
-            container.Controls.Add( ulSizeOptions );
+            paginationContainer.Controls.Add( ulSizeOptions );
 
             for ( int i = 0; i < ItemLinkListItem.Length; i++ )
             {
@@ -3905,7 +3914,7 @@ $('#{this.ClientID} .grid-select-cell').on( 'click', function (event) {{
             // itemCount
             HtmlGenericControl divItemCount = new HtmlGenericControl( "div" );
             divItemCount.Attributes.Add( "class", "grid-itemcount" );
-            container.Controls.Add( divItemCount );
+            paginationContainer.Controls.Add( divItemCount );
 
             itemCountDisplay = new Literal();
             divItemCount.Controls.Add( itemCountDisplay );

@@ -1211,7 +1211,7 @@ namespace RockWeb.Blocks.Groups
                         martialStatusField.Visible = _groupTypeCache.ShowMaritalStatus;
                     }
 
-                    string photoFormat = "<div class=\"photo-icon photo-round photo-round-xs pull-left margin-r-sm js-person-popover\" personid=\"{0}\" data-original=\"{1}&w=50\" style=\"background-image: url( '{2}' ); background-size: cover; background-repeat: no-repeat;\"></div>";
+                    string photoFormat = "<div class=\"photo-icon photo-round photo-round-xs margin-r-sm js-person-popover\" personid=\"{0}\" data-original=\"{1}&w=50\" style=\"background-image: url( '{2}' ); background-size: cover; background-repeat: no-repeat;\"></div>";
 
                     var attendanceFirstLast = new Dictionary<int, DateRange>();
                     bool showAttendance = GetAttributeValue( "ShowAttendance" ).AsBoolean() && _groupTypeCache.TakesAttendance;
