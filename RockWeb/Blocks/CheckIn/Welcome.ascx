@@ -5,7 +5,7 @@
         top: 200px;
     }
 </style>
-<script> 
+<script>
     var timeout = 0;
 </script>
 
@@ -100,7 +100,7 @@
                         // stop the keypress
                         e.preventDefault();
 
-                    } 
+                    }
 
                     lastKeyPress = date.getTime();
 

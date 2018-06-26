@@ -1,0 +1,77 @@
+/*
+
+     Next Check Check-in Theme
+     Crafted by: Spark Development Network
+
+ */
+
+//
+// Imports
+// --------------------------------------------------
+@import "../../../Styles/FontAwesome/font-awesome.less";
+@import "../../../Styles/Bootstrap/bootstrap.less";
+@import "../../../Styles/_checkin-next.less";
+@import "../../../Styles/_modal.less";
+@import "../../../Styles/_helpers.less";
+
+@import "_variables.less";
+@import "_variable-overrides.less";
+
+/*#endregion */
+
+.checkin-actions {
+  .btn-back {
+    width: 80px;
+    height: 80px;
+    font-size: 0;
+    &:before  {
+      font-family: FontAwesome;
+      font-size: 38px;
+      display: inline-block;
+      content: '\f053';
+    }
+  }
+
+  .btn-cancel {
+    float:right;
+    width: 80px;
+    height: 80px;
+    font-size: 0;
+    &:before  {
+      font-family: FontAwesome;
+      font-size: 38px;
+      display: inline-block;
+      content: '\f00d';
+    }
+  }
+}
+//
+// Mix-ins
+// --------------------------------------------------
+.checkinBackground () {
+  background-color: transparent;
+}
+
+.checkinBackgroundRetina() {
+  background-color: transparent;
+}
+
+//
+// Custom Overrides
+// --------------------------------------------------
+
+html {
+  height: 100%;
+  // background: @bg-color @background-image-retina center / cover no-repeat;
+}
+
+body {
+  height: 100%;
+  -ms-touch-action: none !important;
+  touch-action: none;   /* Disable any special actions on tap/touch */
+  // background: @logo-image right bottom no-repeat;
+
+  -ms-content-zooming: none; /* Disables zooming */
+}
+
+@import "_css-overrides.less";
