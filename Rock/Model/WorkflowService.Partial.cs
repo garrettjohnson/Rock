@@ -14,10 +14,8 @@
 // limitations under the License.
 // </copyright>
 //
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Web.Compilation;
 
 using Rock.Data;
 using Rock.Web.Cache;
@@ -49,7 +47,7 @@ namespace Rock.Model
         /// <returns></returns>
         public bool Process( Workflow workflow, object entity, out List<string> errorMessages )
         {
-            var workflowType = WorkflowTypeCache.Read( workflow.WorkflowTypeId );
+            var workflowType = WorkflowTypeCache.Get( workflow.WorkflowTypeId );
             if ( workflowType != null && ( workflowType.IsActive ?? true ) )
             {
                 var rockContext = (RockContext)this.Context;
@@ -79,6 +77,17 @@ namespace Rock.Model
                         if ( workflow.Id == 0 )
                         {
                             Add( workflow );
+                        }
+
+                        // Set EntityId and EntityTypeId if they are not already set and the included entity object is appropriate.
+                        if ( ( workflow.EntityId == null ) && ( workflow.EntityTypeId == null ) && ( entity != null ) )
+                        {
+                            var typedEntity = entity as IEntity;
+                            if ( typedEntity != null )
+                            {
+                                workflow.EntityId = typedEntity.Id;
+                                workflow.EntityTypeId = typedEntity.TypeId;
+                            }
                         }
 
                         rockContext.SaveChanges();
@@ -118,5 +127,34 @@ namespace Rock.Model
                 .OrderBy( w => w.LastProcessedDateTime );
         }
 
+        /// <summary>
+        /// Persists the workflow immediately. Do this if the next actions need a persisted workflow with Ids.
+        /// </summary>
+        /// <param name="action">The action.</param>
+        public void PersistImmediately( WorkflowAction action )
+        {
+            var rockContext = ( RockContext ) this.Context;
+
+            var workflow = action.Activity.Workflow;
+            workflow.IsPersisted = true;
+            workflow.IsProcessing = true;
+
+            if ( workflow.Id == 0 )
+            {
+                Add( workflow );
+            }
+
+            rockContext.WrapTransaction( () =>
+            {
+                rockContext.SaveChanges();
+                workflow.SaveAttributeValues( rockContext );
+                foreach ( var activity in workflow.Activities )
+                {
+                    activity.SaveAttributeValues( rockContext );
+                }
+            } );
+
+            action.AddLogEntry( "Workflow has been persisted!" );
+        }
     }
 }

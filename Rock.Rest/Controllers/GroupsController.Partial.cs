@@ -21,6 +21,7 @@ using System.Data.Entity.Spatial;
 using System.Dynamic;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
 using System.Web.Http;
 using System.Web.Http.OData;
 
@@ -50,6 +51,9 @@ namespace Rock.Rest.Controllers
         /// <param name="countsType">Type of the counts.</param>
         /// <param name="campusId">if set it will filter groups based on campus</param>
         /// <param name="includeNoCampus">if campus set and set to <c>true</c> [include groups with no campus].</param>
+        /// <param name="limitToPublic">if set to <c>true</c> [limit to public groups].</param>
+        /// <param name="limitToSchedulingEnabled">if set to <c>true</c> only includes groups that have SchedulingEnabled (or has a child group that has SchedulingEnabled).</param>
+        /// <param name="limitToRSVPEnabled">if set to <c>true</c> only includes groups that have RSVPEnabled (or has a child group that has RSVPEnabled).</param>
         /// <returns></returns>
         [Authenticate, Secured]
         [System.Web.Http.Route( "api/Groups/GetChildren/{id}" )]
@@ -62,7 +66,10 @@ namespace Rock.Rest.Controllers
             bool includeInactiveGroups = false,
             TreeViewItem.GetCountsType countsType = TreeViewItem.GetCountsType.None,
             int campusId = 0,
-            bool includeNoCampus = false )
+            bool includeNoCampus = false,
+            bool limitToPublic  = false,
+            bool limitToSchedulingEnabled = false,
+            bool limitToRSVPEnabled = false)
         {
             // Enable proxy creation since security is being checked and need to navigate parent authorities
             SetProxyCreation( true );
@@ -75,7 +82,9 @@ namespace Rock.Rest.Controllers
             // if specific group types are specified, show the groups regardless of ShowInNavigation
             bool limitToShowInNavigation = !includedGroupTypeIdList.Any();
 
-            var qry = groupService.GetChildren( id, rootGroupId, limitToSecurityRoleGroups, includedGroupTypeIdList, excludedGroupTypeIdList, includeInactiveGroups, limitToShowInNavigation, campusId, includeNoCampus );
+            var qry = groupService
+                .GetChildren( id, rootGroupId, limitToSecurityRoleGroups, includedGroupTypeIdList, excludedGroupTypeIdList, includeInactiveGroups, limitToShowInNavigation, campusId, includeNoCampus, limitToPublic )
+                .AsNoTracking();
 
             List<Group> groupList = new List<Group>();
             List<TreeViewItem> groupNameList = new List<TreeViewItem>();
@@ -86,30 +95,67 @@ namespace Rock.Rest.Controllers
             {
                 if ( group.IsAuthorized( Rock.Security.Authorization.VIEW, person ) )
                 {
-                    groupList.Add( group );
-                    var treeViewItem = new TreeViewItem();
-                    treeViewItem.Id = group.Id.ToString();
-                    treeViewItem.Name = group.Name;
-                    treeViewItem.IsActive = group.IsActive;
+                    var groupType = GroupTypeCache.Get( group.GroupTypeId );
 
-                    // if there a IconCssClass is assigned, use that as the Icon.
-                    var groupType = Rock.Web.Cache.GroupTypeCache.Read( group.GroupTypeId );
-                    if ( groupType != null )
+                    bool includeGroup_Scheduling = true;
+                    if ( limitToSchedulingEnabled )
                     {
-                        treeViewItem.IconCssClass = groupType.IconCssClass;
+                        includeGroup_Scheduling = false;
+                        if ( groupType?.IsSchedulingEnabled == true )
+                        {
+                            includeGroup_Scheduling = true;
+                        }
+                        else
+                        {
+                            bool hasChildScheduledEnabledGroups = groupService.GetAllDescendentsGroupTypes( group.Id, includeInactiveGroups ).Any( a => a.IsSchedulingEnabled == true );
+                            if ( hasChildScheduledEnabledGroups )
+                            {
+                                includeGroup_Scheduling = true;
+                            }
+                        }
                     }
 
-                    if ( countsType == TreeViewItem.GetCountsType.GroupMembers )
+                    bool includeGroup_RSVP = true;
+                    if ( limitToRSVPEnabled )
                     {
-                        int groupMemberCount = new GroupMemberService( this.Service.Context as RockContext ).Queryable().Where( a => a.GroupId == group.Id && a.GroupMemberStatus == GroupMemberStatus.Active).Count();
-                        treeViewItem.CountInfo = groupMemberCount;
-                    }
-                    else if ( countsType == TreeViewItem.GetCountsType.ChildGroups )
-                    {
-                        treeViewItem.CountInfo = groupService.Queryable().Where( a => a.ParentGroupId.HasValue && a.ParentGroupId == group.Id ).Count();
+                        includeGroup_RSVP = false;
+                        if ( groupType?.EnableRSVP == true )
+                        {
+                            includeGroup_RSVP = true;
+                        }
+                        else
+                        {
+                            bool hasChildRSVPEnabledGroups = groupService.GetAllDescendentsGroupTypes( group.Id, includeInactiveGroups ).Any( a => a.EnableRSVP == true );
+                            if ( hasChildRSVPEnabledGroups )
+                            {
+                                includeGroup_RSVP = true;
+                            }
+                        }
                     }
 
-                    groupNameList.Add( treeViewItem );
+                    if ( includeGroup_Scheduling && includeGroup_RSVP )
+                    {
+                        groupList.Add( group );
+                        var treeViewItem = new TreeViewItem();
+                        treeViewItem.Id = group.Id.ToString();
+                        treeViewItem.Name = group.Name;
+                        treeViewItem.IsActive = group.IsActive;
+
+                        // if there a IconCssClass is assigned, use that as the Icon.
+                        treeViewItem.IconCssClass = groupType?.IconCssClass;
+
+                        if ( countsType == TreeViewItem.GetCountsType.GroupMembers )
+                        {
+                            int groupMemberCount = new GroupMemberService( this.Service.Context as RockContext ).Queryable().Where( a => a.GroupId == group.Id && a.GroupMemberStatus == GroupMemberStatus.Active ).Count();
+                            treeViewItem.CountInfo = groupMemberCount;
+                        }
+                        else if ( countsType == TreeViewItem.GetCountsType.ChildGroups )
+                        {
+                            treeViewItem.CountInfo = groupService.Queryable().Where( a => a.ParentGroupId.HasValue && a.ParentGroupId == group.Id ).Count();
+                        }
+
+                        groupNameList.Add( treeViewItem );
+                    }
                 }
             }
 
@@ -155,6 +201,97 @@ namespace Rock.Rest.Controllers
         public IQueryable<Group> GetFamilies( int personId )
         {
             return new PersonService( (RockContext)Service.Context ).GetFamilies( personId );
+        }
+
+
+        /// <summary>
+        /// Returns a simplified data structure of the check-in parameters. This is used by FrontPorch but is generalized.
+        /// </summary>
+        /// <param name="groupTypeGuid">The group type unique identifier.</param>
+        /// <returns></returns>
+        [Authenticate, Secured]
+        [HttpGet]
+        [System.Web.Http.Route( "api/Groups/GroupTypeCheckinConfiguration/{groupTypeGuid}" )]
+        public HttpResponseMessage GroupTypeCheckinConfiguration( Guid groupTypeGuid )
+        {
+            var groups = new GroupService( new RockContext() ).Queryable().AsNoTracking()
+                            .Where( g => g.GroupType.Guid == groupTypeGuid )
+                            .Select( g => new CheckinConfig
+                            {
+                                Id = g.Id,
+                                Name = g.Name,
+                                Guid = g.Guid,
+                                Locations = g.GroupLocations.Select( l => new CheckinConfigLocation
+                                {
+                                    Id = l.Location.Id,
+                                    Name = l.Location.Name,
+                                    Guid = l.Location.Guid,
+                                    GeoFence = l.Location.GeoFence,
+                                    Latitude = l.Location.GeoPoint.Latitude,
+                                    Longitude = l.Location.GeoPoint.Longitude,
+                                    Street1 = l.Location.Street1,
+                                    City = l.Location.City,
+                                    State = l.Location.State,
+                                    PostalCode = l.Location.PostalCode,
+                                    Country = l.Location.Country,
+                                    IsActive = l.Location.IsActive,
+                                    LocationType = l.Location.LocationTypeValue.Value,
+                                    LocationTypeId = l.Location.LocationTypeValue.Id,
+                                    Schedules = l.Schedules.Select( s => new CheckinConfigLocationSchedule
+                                    {
+                                        Id = s.Id,
+                                        Name = s.Name,
+                                        Guid = s.Guid,
+                                        IcalContent = s.iCalendarContent,
+                                        Category = s.Category.Name,
+                                        IsActive = s.IsActive
+                                    } )
+                                } )
+                            } )
+                            .ToList();
+
+            // The returned type is great but lets add some schedule details from the ical string
+
+            foreach (var groupCheckinInfo in groups)
+            {
+                if ( groupCheckinInfo.Locations.IsNull() )
+                {
+                    return this.Request.CreateResponse( groupCheckinInfo );
+                }
+
+                foreach ( var location in groupCheckinInfo.Locations )
+                {
+                    if ( location.Schedules.IsNull() )
+                    {
+                        continue;
+                    }
+
+                    foreach ( var schedule in location.Schedules )
+                    {
+                        var scheduleDetails = ScheduleICalHelper.GetCalendarEvent( schedule.IcalContent );
+
+                        if ( scheduleDetails.RecurrenceRules.Count == 0 )
+                        {
+                            continue;
+                        }
+
+                        schedule.DayOfWeek = scheduleDetails.RecurrenceRules[0].ByDay.FirstOrDefault()?.DayOfWeek;
+
+                        schedule.StartTime = scheduleDetails.DTStart.Value.TimeOfDay;
+
+                        var duration = scheduleDetails.Duration;
+
+                        if ( duration == null )
+                        {
+                            continue;
+                        }
+
+                        schedule.EndTime = schedule.StartTime.Add( duration );
+                    }
+                }
+            }
+
+            return this.Request.CreateResponse( groups ); 
         }
 
         /// <summary>
@@ -284,7 +421,6 @@ namespace Rock.Rest.Controllers
                                                     && g.GroupRole.Guid == knownRelationshipOwner
                                                     && familyMembers.Contains( g.PersonId ) )
                                     .Select( m => m.GroupId );
-            rockContext.Database.Log = s => System.Diagnostics.Debug.WriteLine( s );
             var guests = groupMemberService.Queryable()
                                     .Where( g => g.GroupRole.Guid == knownRelationshipCanCheckin
                                                     && familyMembersKnownRelationshipGroups.Contains( g.GroupId ) )
@@ -330,30 +466,6 @@ namespace Rock.Rest.Controllers
             }
 
             return guestFamilies.AsQueryable();
-        }
-
-        /// <summary>
-        /// Gets a group by location.
-        /// </summary>
-        /// <param name="geofenceGroupTypeId">The geofence group type identifier.</param>
-        /// <param name="groupTypeId">The group type identifier.</param>
-        /// <param name="locationId">The location identifier.</param>
-        /// <param name="queryOptions">The query options.</param>
-        /// <returns></returns>
-        [Authenticate, Secured]
-        [HttpGet]
-        [Obsolete( "Use one of the other ~/api/Groups/ByLocation endpoint(s)" )]
-        [System.Web.Http.Route( "api/Groups/ByLocation/{geofenceGroupTypeId}/{groupTypeId}/{locationId}" )]
-        public IQueryable GetByLocation( int geofenceGroupTypeId, int groupTypeId, int locationId, System.Web.Http.OData.Query.ODataQueryOptions<Group> queryOptions )
-        {
-            // Get the location record
-            var rockContext = (RockContext)Service.Context;
-            var specifiedLocation = new LocationService( rockContext ).Get( locationId );
-
-            // If location was valid and address was geocoded successfully
-            DbGeography geoPoint = specifiedLocation != null ? specifiedLocation.GeoPoint : null;
-
-            return GetByGeoPoint( groupTypeId, geoPoint, false, null, geofenceGroupTypeId, queryOptions );
         }
 
         /// <summary>
@@ -540,7 +652,7 @@ namespace Rock.Rest.Controllers
             var rockContext = (RockContext)Service.Context;
             var group = new GroupService( rockContext ).Get( groupId );
 
-            var locationType = DefinedValueCache.Read( locationTypeId );
+            var locationType = DefinedValueCache.Get( locationTypeId );
             if ( group == null || locationType == null )
             {
                 throw new HttpResponseException( HttpStatusCode.NotFound );
@@ -549,60 +661,6 @@ namespace Rock.Rest.Controllers
             System.Web.HttpContext.Current.Items.Add( "CurrentPerson", GetPerson() );
 
             GroupService.AddNewGroupAddress( rockContext, group, locationType.Guid.ToString(), street1, street2, city, state, postalCode, country, true );
-        }
-
-        /// <summary>
-        /// Puts the specified identifier.
-        /// </summary>
-        /// <param name="id">The identifier.</param>
-        /// <param name="group">The group.</param>
-        public override void Put( int id, Group group )
-        {
-            var familyGroupType = GroupTypeCache.Read( Rock.SystemGuid.GroupType.GROUPTYPE_FAMILY.AsGuid() );
-            if ( familyGroupType != null && familyGroupType.Id == group.GroupTypeId )
-            {
-                SetProxyCreation( true );
-
-                var rockContext = (RockContext)Service.Context;
-                var existingGroup = Service.Get( id );
-                if ( existingGroup != null )
-                {
-                    var changes = new List<string>();
-                    string oldCampus = existingGroup.Campus != null ? existingGroup.Campus.Name : string.Empty;
-                    string newCampus = group.Campus != null ? group.Campus.Name : string.Empty;
-                    if ( group.CampusId.HasValue && string.IsNullOrWhiteSpace( newCampus ) )
-                    {
-                        var campus = CampusCache.Read( group.CampusId.Value );
-                        newCampus = campus != null ? campus.Name : string.Empty;
-                    }
-
-                    History.EvaluateChange( changes, "Campus", oldCampus, newCampus );
-
-                    if ( changes.Any() )
-                    {
-                        System.Web.HttpContext.Current.Items.Add( "CurrentPerson", GetPerson() );
-
-                        int? modifiedByPersonAliasId = group.ModifiedAuditValuesAlreadyUpdated ? group.ModifiedByPersonAliasId : (int?)null;
-
-                        foreach ( var fm in existingGroup.Members )
-                        {
-                            HistoryService.SaveChanges(
-                                rockContext,
-                                typeof( Person ),
-                                Rock.SystemGuid.Category.HISTORY_PERSON_FAMILY_CHANGES.AsGuid(),
-                                fm.PersonId,
-                                changes,
-                                existingGroup.Name,
-                                typeof( Group ),
-                                existingGroup.Id,
-                                true,
-                                modifiedByPersonAliasId );
-                        }
-                    }
-                }
-            }
-
-            base.Put( id, group );
         }
 
         #region MapInfo methods
@@ -637,7 +695,7 @@ namespace Rock.Rest.Controllers
                         .Select( l => l.Location ) )
                     {
                         var mapItem = new MapItem( location );
-                        mapItem.EntityTypeId = EntityTypeCache.Read( "Rock.Model.Group" ).Id;
+                        mapItem.EntityTypeId = EntityTypeCache.Get( "Rock.Model.Group" ).Id;
                         mapItem.EntityId = group.Id;
                         mapItem.Name = group.Name;
                         if ( mapItem.Point != null || mapItem.PolygonPoints.Any() )
@@ -679,15 +737,15 @@ namespace Rock.Rest.Controllers
 
             var groupService = (GroupService)Service;
             var groupLocationService = new GroupLocationService( groupService.Context as RockContext );
-            IEnumerable<Group> childGroups;
+            List<Group> childGroups;
 
             if ( !includeDescendants )
             {
-                childGroups = groupService.Queryable().Where( g => g.ParentGroupId == groupId );
+                childGroups = groupService.Queryable().Where( g => g.ParentGroupId == groupId ).AsNoTracking().ToList();
             }
             else
             {
-                childGroups = groupService.GetAllDescendents( groupId );
+                childGroups = groupService.GetAllDescendentGroups( groupId, false ).ToList();
             }
 
             if ( !string.IsNullOrWhiteSpace( groupTypeIds ) ) 
@@ -695,14 +753,14 @@ namespace Rock.Rest.Controllers
                 var groupTypeIdList = groupTypeIds.Split( ',' ).AsIntegerList();
                 if ( groupTypeIdList.Any() )
                 {
-                    childGroups = childGroups.Where( a => groupTypeIdList.Contains( a.GroupTypeId ) );
+                    childGroups = childGroups.Where( a => groupTypeIdList.Contains( a.GroupTypeId ) ).ToList();
                 }
             }
 
             var childGroupIds = childGroups.Select( a => a.Id ).ToList();
 
             // fetch all the groupLocations for all the groups we are going to show (to reduce SQL traffic)
-            var groupsLocationList = groupLocationService.Queryable().Where( a => childGroupIds.Contains( a.GroupId ) && a.Location.GeoPoint != null || a.Location.GeoFence != null ).Select( a => new
+            var groupsLocationList = groupLocationService.Queryable().Where( a => childGroupIds.Contains( a.GroupId ) && a.Location.GeoPoint != null || a.Location.GeoFence != null ).AsNoTracking().Select( a => new
             {
                 a.GroupId,
                 a.Location
@@ -716,7 +774,7 @@ namespace Rock.Rest.Controllers
                     foreach ( var location in groupLocations )
                     {
                         var mapItem = new MapItem( location );
-                        mapItem.EntityTypeId = EntityTypeCache.Read( "Rock.Model.Group" ).Id;
+                        mapItem.EntityTypeId = EntityTypeCache.Get( "Rock.Model.Group" ).Id;
                         mapItem.EntityId = group.Id;
                         mapItem.Name = group.Name;
                         if ( mapItem.Point != null || mapItem.PolygonPoints.Any() )
@@ -734,12 +792,13 @@ namespace Rock.Rest.Controllers
         /// Gets the member map information.
         /// </summary>
         /// <param name="groupId">The group identifier.</param>
+        /// <param name="groupMemberStatus">The group member status.</param>
         /// <returns></returns>
         /// <exception cref="System.Web.Http.HttpResponseException">
         /// </exception>
         [Authenticate, Secured]
-        [System.Web.Http.Route( "api/Groups/GetMapInfo/{groupId}/Members" )]
-        public IQueryable<MapItem> GetMemberMapInfo( int groupId )
+        [System.Web.Http.Route( "api/Groups/GetMapInfo/{groupId}/Members/{groupMemberStatus?}" )]
+        public IQueryable<MapItem> GetMemberMapInfo( int groupId, GroupMemberStatus? groupMemberStatus = null )
         {
             // Enable proxy creation since security is being checked and need to navigate parent authorities
             SetProxyCreation( true );
@@ -757,7 +816,14 @@ namespace Rock.Rest.Controllers
                     var mapItems = new List<MapItem>();
 
                     Guid familyGuid = new Guid( Rock.SystemGuid.GroupType.GROUPTYPE_FAMILY );
-                    var memberIds = group.Members.Select( m => m.PersonId ).Distinct().ToList();
+                    var members = group.Members;
+
+                    if ( groupMemberStatus.HasValue )
+                    {
+                        members = members.Where(a=>a.GroupMemberStatus == groupMemberStatus.Value).ToList();
+                    }
+
+                    var memberIds = members.Select( m => m.PersonId ).Distinct().ToList();
                     var families = ( (GroupService)Service ).Queryable( "GroupLocations.Location" )
                         .Where( g =>
                             g.GroupType.Guid == familyGuid &&
@@ -771,7 +837,7 @@ namespace Rock.Rest.Controllers
                             .Select( g => g.Location ) )
                         {
                             var mapItem = new MapItem( location );
-                            mapItem.EntityTypeId = EntityTypeCache.Read( "Rock.Model.Group" ).Id;
+                            mapItem.EntityTypeId = EntityTypeCache.Get( "Rock.Model.Group" ).Id;
                             mapItem.EntityId = family.Id;
                             mapItem.Name = family.Name;
                             if ( mapItem.Point != null || mapItem.PolygonPoints.Any() )
@@ -841,7 +907,7 @@ namespace Rock.Rest.Controllers
                         .Select( l => l.Location ) )
                     {
                         var familyGroupTypeId = GroupTypeCache.GetFamilyGroupType().Id;
-                        var recordStatusActiveId = DefinedValueCache.Read( Rock.SystemGuid.DefinedValue.PERSON_RECORD_STATUS_ACTIVE.AsGuid() ).Id;
+                        var recordStatusActiveId = DefinedValueCache.Get( Rock.SystemGuid.DefinedValue.PERSON_RECORD_STATUS_ACTIVE.AsGuid() ).Id;
                         
                         var families = new GroupLocationService( (RockContext)Service.Context ).Queryable()
                             .Where( l =>
@@ -878,7 +944,7 @@ namespace Rock.Rest.Controllers
                         foreach ( var family in families.Where( f => f.MinStatus == statusId ) )
                         {
                             var mapItem = new MapItem( family.Location );
-                            mapItem.EntityTypeId = EntityTypeCache.Read( "Rock.Model.Group" ).Id;
+                            mapItem.EntityTypeId = EntityTypeCache.Get( "Rock.Model.Group" ).Id;
                             mapItem.EntityId = family.Id;
                             mapItem.Name = family.Name;
                             if ( mapItem.Point != null || mapItem.PolygonPoints.Any() )
@@ -1234,6 +1300,249 @@ namespace Rock.Rest.Controllers
             /// The template.
             /// </value>
             public string Template { get; set; }
+        }
+
+        /// <summary>
+        /// POCO for sending checkin configuration information
+        /// </summary>
+        public class CheckinConfig
+        {
+            /// <summary>
+            /// Gets or sets the identifier.
+            /// </summary>
+            /// <value>
+            /// The identifier.
+            /// </value>
+            public int Id { get; set; }
+
+            /// <summary>
+            /// Gets or sets the name.
+            /// </summary>
+            /// <value>
+            /// The name.
+            /// </value>
+            public string Name { get; set; }
+
+            /// <summary>
+            /// Gets or sets the unique identifier.
+            /// </summary>
+            /// <value>
+            /// The unique identifier.
+            /// </value>
+            public Guid Guid { get; set; }
+
+            /// <summary>
+            /// Gets or sets the locations.
+            /// </summary>
+            /// <value>
+            /// The locations.
+            /// </value>
+            public IEnumerable<CheckinConfigLocation> Locations { get; set; }
+        }
+
+        /// <summary>
+        /// POCO for the checkin location information
+        /// </summary>
+        public class CheckinConfigLocation
+        {
+            /// <summary>
+            /// Gets or sets the identifier.
+            /// </summary>
+            /// <value>
+            /// The identifier.
+            /// </value>
+            public int Id { get; set; }
+
+            /// <summary>
+            /// Gets or sets the name.
+            /// </summary>
+            /// <value>
+            /// The name.
+            /// </value>
+            public string Name { get; set; }
+
+            /// <summary>
+            /// Gets or sets the unique identifier.
+            /// </summary>
+            /// <value>
+            /// The unique identifier.
+            /// </value>
+            public Guid Guid { get; set; }
+
+            /// <summary>
+            /// Gets or sets the geofence.
+            /// </summary>
+            /// <value>
+            /// The geofence.
+            /// </value>
+            public DbGeography GeoFence { get; set; }
+
+
+            /// <summary>
+            /// Gets or sets the latitude.
+            /// </summary>
+            /// <value>
+            /// The latitude.
+            /// </value>
+            public double? Latitude { get; set; }
+
+            /// <summary>
+            /// Gets or sets the longitude.
+            /// </summary>
+            /// <value>
+            /// The longitude.
+            /// </value>
+            public double? Longitude { get; set; }
+
+            /// <summary>
+            /// Gets or sets the street1.
+            /// </summary>
+            /// <value>
+            /// The street1.
+            /// </value>
+            public string Street1 { get; set; }
+
+            /// <summary>
+            /// Gets or sets the city.
+            /// </summary>
+            /// <value>
+            /// The city.
+            /// </value>
+            public string City { get; set; }
+
+            /// <summary>
+            /// Gets or sets the state.
+            /// </summary>
+            /// <value>
+            /// The state.
+            /// </value>
+            public string State { get; set; }
+
+            /// <summary>
+            /// Gets or sets the postal code.
+            /// </summary>
+            /// <value>
+            /// The postal code.
+            /// </value>
+            public string PostalCode { get; set; }
+
+            /// <summary>
+            /// Gets or sets the country.
+            /// </summary>
+            /// <value>
+            /// The country.
+            /// </value>
+            public string Country { get; set; }
+
+            /// <summary>
+            /// Gets or sets a value indicating whether this instance is active.
+            /// </summary>
+            /// <value>
+            ///   <c>true</c> if this instance is active; otherwise, <c>false</c>.
+            /// </value>
+            public bool IsActive { get; set; }
+
+            /// <summary>
+            /// Gets or sets the type of the location.
+            /// </summary>
+            /// <value>
+            /// The type of the location.
+            /// </value>
+            public string LocationType { get; set; }
+
+            /// <summary>
+            /// Gets or sets the location type identifier.
+            /// </summary>
+            /// <value>
+            /// The location type identifier.
+            /// </value>
+            public int LocationTypeId { get; set; }
+
+            /// <summary>
+            /// Gets or sets the schedules.
+            /// </summary>
+            /// <value>
+            /// The schedules.
+            /// </value>
+            public IEnumerable<CheckinConfigLocationSchedule> Schedules { get; set; }
+        }
+
+        /// <summary>
+        /// POCO for holding location schedule information
+        /// </summary>
+        public class CheckinConfigLocationSchedule
+        {
+            /// <summary>
+            /// Gets or sets the identifier.
+            /// </summary>
+            /// <value>
+            /// The identifier.
+            /// </value>
+            public int Id { get; set; }
+
+            /// <summary>
+            /// Gets or sets the name.
+            /// </summary>
+            /// <value>
+            /// The name.
+            /// </value>
+            public string Name { get; set; }
+
+            /// <summary>
+            /// Gets or sets the unique identifier.
+            /// </summary>
+            /// <value>
+            /// The unique identifier.
+            /// </value>
+            public Guid Guid { get; set; }
+
+            /// <summary>
+            /// Gets or sets the content of the ical.
+            /// </summary>
+            /// <value>
+            /// The content of the ical.
+            /// </value>
+            public string IcalContent { get; set; }
+
+            /// <summary>
+            /// Gets or sets the name of the category.
+            /// </summary>
+            /// <value>
+            /// The name of the category.
+            /// </value>
+            public string Category { get; set; }
+
+            /// <summary>
+            /// Gets or sets a value indicating whether this instance is active.
+            /// </summary>
+            /// <value>
+            ///   <c>true</c> if this instance is active; otherwise, <c>false</c>.
+            /// </value>
+            public bool IsActive { get; set; }
+
+            /// <summary>
+            /// Gets or sets the day of week.
+            /// </summary>
+            /// <value>
+            /// The day of week.
+            /// </value>
+            public DayOfWeek? DayOfWeek { get; set; }
+
+            /// <summary>
+            /// Gets or sets the start time.
+            /// </summary>
+            /// <value>
+            /// The start time.
+            /// </value>
+            public TimeSpan StartTime { get; set; }
+
+            /// <summary>
+            /// Gets or sets the end time.
+            /// </summary>
+            /// <value>
+            /// The end time.
+            /// </value>
+            public TimeSpan EndTime { get; set; }
         }
 
         /// <summary>

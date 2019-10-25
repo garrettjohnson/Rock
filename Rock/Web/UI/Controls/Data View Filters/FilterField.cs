@@ -21,6 +21,7 @@ using System.Web;
 using System.Web.UI;
 using System.Web.UI.HtmlControls;
 using System.Web.UI.WebControls;
+
 using Rock;
 using Rock.Reporting;
 using Rock.Security;
@@ -57,6 +58,11 @@ namespace Rock.Web.UI.Controls
         public RockCheckBox cbIncludeFilter;
 
         /// <summary>
+        /// If the component has a Description this will be rendered with a description
+        /// </summary>
+        protected NotificationBox nbComponentDescription;
+
+        /// <summary>
         /// The filter controls
         /// </summary>
         protected Control[] filterControls;
@@ -68,12 +74,11 @@ namespace Rock.Web.UI.Controls
         protected override void OnInit( EventArgs e )
         {
             base.OnInit( e );
-
-            ReportingHelper.RegisterJavascriptInclude( this );
         }
 
         /// <summary>
         /// Gets or sets the name of entity type that is being filtered.
+        /// NOTE: This is not to be confused with FilterEntityTypeName which is the DataFilter.Type.
         /// </summary>
         /// <value>
         /// The name of the filtered entity type.
@@ -156,7 +161,7 @@ namespace Rock.Web.UI.Controls
         {
             get
             {
-                var entityTypeCache = EntityTypeCache.Read( FilteredEntityTypeName );
+                var entityTypeCache = EntityTypeCache.Get( FilteredEntityTypeName );
                 if ( entityTypeCache != null )
                 {
                     return entityTypeCache.GetEntityType();
@@ -169,6 +174,7 @@ namespace Rock.Web.UI.Controls
         /// <summary>
         /// Gets or sets the name of the filter entity type.  This is a DataFilter type
         /// that applies to the FilteredEntityType
+        /// NOTE: This is not to be confused with FilteredEntityTypeName which is the Rock.Data.EntityType
         /// </summary>
         /// <value>
         /// The name of the entity type.
@@ -225,6 +231,14 @@ namespace Rock.Web.UI.Controls
         }
 
         /// <summary>
+        /// Set this to a specific Entity to limit Filters that only apply to this Entity
+        /// </summary>
+        /// <value>
+        /// The entity fields override.
+        /// </value>
+        public Rock.Data.IEntity Entity { get; set; }
+
+        /// <summary>
         /// Gets or sets the filter mode (Advanced Filter or Simple Filter)
         /// </summary>
         /// <value>
@@ -239,6 +253,24 @@ namespace Rock.Web.UI.Controls
             set
             {
                 ViewState["FilterMode"] = value;
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether [hide filter criteria].
+        /// </summary>
+        /// <value>
+        ///   <c>true</c> if [hide filter criteria]; otherwise, <c>false</c>.
+        /// </value>
+        public bool HideDescription
+        {
+            get
+            {
+                return ViewState["HideDescription"] as bool? ?? false;
+            }
+            set
+            {
+                ViewState["HideDescription"] = value;
             }
         }
 
@@ -275,6 +307,39 @@ namespace Rock.Web.UI.Controls
             set
             {
                 ViewState["ShowCheckbox"] = value;
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets the validation group.
+        /// </summary>
+        /// <value>
+        /// The validation group.
+        /// </value>
+        public string ValidationGroup
+        {
+            get
+            {
+                return ViewState["ValidationGroup"] as string;
+            }
+
+            set
+            {
+                ViewState["ValidationGroup"] = value;
+                SetFilterControlsValidationGroup( value );
+            }
+        }
+
+        /// <summary>
+        /// Sets the filter controls validation group.
+        /// </summary>
+        /// <param name="validationGroup">The validation group.</param>
+        private void SetFilterControlsValidationGroup( string validationGroup )
+        {
+            var rockBlock = this.RockBlock();
+            if ( filterControls != null && rockBlock != null && validationGroup != null )
+            {
+                rockBlock.SetValidationGroup( filterControls, validationGroup );
             }
         }
 
@@ -437,6 +502,11 @@ namespace Rock.Web.UI.Controls
             var component = Rock.Reporting.DataFilterContainer.GetComponent( FilterEntityTypeName );
             if ( component != null )
             {
+                if ( component is Reporting.DataFilter.PropertyFilter )
+                {
+                    ( component as Reporting.DataFilter.PropertyFilter ).Entity = this.Entity;
+                }
+
                 component.Options = FilterOptions;
                 filterControls = component.CreateChildControls( FilteredEntityType, this, this.FilterMode );
             }
@@ -444,6 +514,8 @@ namespace Rock.Web.UI.Controls
             {
                 filterControls = new Control[0];
             }
+
+            SetFilterControlsValidationGroup( this.ValidationGroup );
 
             ddlFilterType.AutoPostBack = true;
             ddlFilterType.SelectedIndexChanged += ddlFilterType_SelectedIndexChanged;
@@ -487,7 +559,7 @@ namespace Rock.Web.UI.Controls
             lbDelete = new LinkButton();
             Controls.Add( lbDelete );
             lbDelete.ID = this.ID + "_lbDelete";
-            lbDelete.CssClass = "btn btn-xs btn-danger ";
+            lbDelete.CssClass = "btn btn-xs btn-square btn-danger";
             lbDelete.Click += lbDelete_Click;
             lbDelete.CausesValidation = false;
 
@@ -497,8 +569,14 @@ namespace Rock.Web.UI.Controls
 
             cbIncludeFilter = new RockCheckBox();
             cbIncludeFilter.ContainerCssClass = "filterfield-checkbox";
+            cbIncludeFilter.TextCssClass = "control-label";
             Controls.Add( cbIncludeFilter );
             cbIncludeFilter.ID = this.ID + "_cbIncludeFilter";
+
+            nbComponentDescription = new NotificationBox();
+            nbComponentDescription.NotificationBoxType = NotificationBoxType.Info;
+            nbComponentDescription.ID = this.ID + "_nbComponentDescription";
+            Controls.Add( nbComponentDescription );
         }
 
         /// <summary>
@@ -605,12 +683,12 @@ namespace Rock.Web.UI.Controls
             writer.RenderBeginTag( HtmlTextWriterTag.Div );
             writer.AddAttribute( "class", "col-md-12" );
             writer.RenderBeginTag( HtmlTextWriterTag.Div );
-            
+
             if ( ShowCheckbox )
             {
-                //// EntityFieldFilter renders the checkbox itself (see EntityFieldFilter.cs), 
+                //// EntityFieldFilter renders the checkbox itself (see EntityFieldFilter.cs),
                 //// so only render the checkbox if we are hiding filter criteria and it isn't an entity field filter
-                if ( !( component is Rock.Reporting.DataFilter.EntityFieldFilter ) || HideFilterCriteria)
+                if ( !( component is Rock.Reporting.DataFilter.EntityFieldFilter ) || HideFilterCriteria )
                 {
                     cbIncludeFilter.Text = this.Label;
                     cbIncludeFilter.RenderControl( writer );
@@ -627,6 +705,13 @@ namespace Rock.Web.UI.Controls
 
             if ( component != null && !HideFilterCriteria )
             {
+                if ( !string.IsNullOrEmpty( component.Description ) && !HideDescription )
+                {
+                    nbComponentDescription.Text = component.Description;
+                    nbComponentDescription.CssClass = "filter-field-description";
+                    nbComponentDescription.RenderControl( writer );
+                }
+
                 component.RenderControls( FilteredEntityType, this, writer, filterControls, this.FilterMode );
             }
 
@@ -646,9 +731,14 @@ namespace Rock.Web.UI.Controls
             }
         }
 
-        void ddlFilterType_SelectedIndexChanged( object sender, EventArgs e )
+        /// <summary>
+        /// Handles the SelectedIndexChanged event of the ddlFilterType control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
+        private void ddlFilterType_SelectedIndexChanged( object sender, EventArgs e )
         {
-            FilterEntityTypeName = ( (DropDownList)sender ).SelectedValue;
+            FilterEntityTypeName = ( ( DropDownList ) sender ).SelectedValue;
 
             if ( SelectionChanged != null )
             {
@@ -656,7 +746,12 @@ namespace Rock.Web.UI.Controls
             }
         }
 
-        void lbDelete_Click( object sender, EventArgs e )
+        /// <summary>
+        /// Handles the Click event of the lbDelete control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
+        private void lbDelete_Click( object sender, EventArgs e )
         {
             if ( DeleteClick != null )
             {
@@ -673,7 +768,5 @@ namespace Rock.Web.UI.Controls
         /// Occurs when [selection changed].
         /// </summary>
         public event EventHandler SelectionChanged;
-
-
     }
 }

@@ -17,6 +17,8 @@
 using System;
 using System.Configuration;
 
+using Rock.Web.Cache;
+
 namespace Rock
 {
     /// <summary>
@@ -137,6 +139,100 @@ namespace Rock
             catch { }
 
             return (DateTime?)null;
+        }
+
+        /// <summary>
+        /// Gets the current graduation date base on the GradeTransitionDate GlobalAttribute and current datetime.
+        /// For example, if the Grade Transition Date is June 1st and the current date is June 1st or earlier, it will return June 1st of the current year;
+        /// otherwise, it will return June 1st of next year
+        /// </summary>
+        /// <value>
+        /// The current graduation date.
+        /// </value>
+        public static DateTime CurrentGraduationDate
+        {
+            get
+            {
+                var graduationDateWithCurrentYear = GlobalAttributesCache.Get().GetValue( "GradeTransitionDate" ).MonthDayStringAsDateTime() ?? new DateTime( RockDateTime.Today.Year, 6, 1 );
+                if ( graduationDateWithCurrentYear < RockDateTime.Today )
+                {
+                    // if the graduation date already occurred this year, return next year' graduation date
+                    return graduationDateWithCurrentYear.AddYears( 1 );
+                }
+                else
+                {
+                    return graduationDateWithCurrentYear;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gets the current graduation year based on <see cref="CurrentGraduationDate"/>
+        /// </summary>
+        /// <value>
+        /// The current graduation year.
+        /// </value>
+        public static int CurrentGraduationYear => CurrentGraduationDate.Year;
+
+        /// <summary>
+        /// Gets the Date of which Sunday is associated with the specified Date/Time, based on <see cref="RockDateTime.FirstDayOfWeek"/>
+        /// </summary>
+        /// <param name="dateTime">The DateTime.</param>
+        /// <returns></returns>
+        public static DateTime GetSundayDate( DateTime dateTime )
+        {
+            return GetSundayDate( dateTime, RockDateTime.FirstDayOfWeek );
+        }
+
+        /// <summary>
+        /// Gets the Date of which Sunday is associated with the specified Date/Time, based on what the First Day Of Week is defined as.
+        /// </summary>
+        /// <param name="dateTime">The date time.</param>
+        /// <param name="firstDayOfWeek">The first day of week.</param>
+        /// <returns></returns>
+        public static DateTime GetSundayDate( DateTime dateTime, DayOfWeek firstDayOfWeek )
+        {
+            if ( dateTime.DayOfWeek == DayOfWeek.Sunday )
+            {
+                return dateTime.Date;
+            }
+            else
+            {
+                // Get the number of days until the next Sunday date
+                int sundayDiff = 7 - ( int ) dateTime.DayOfWeek;
+
+                // Figure out which DayOfWeek would be the lastDayOfWeek
+                // which would be the DayOfWeek before the startDayOfWeek
+                DayOfWeek lastDayOfWeek;
+
+                if ( firstDayOfWeek == DayOfWeek.Sunday )
+                {
+                    // The day before Sunday is Saturday
+                    lastDayOfWeek = DayOfWeek.Saturday;
+                }
+                else
+                {
+                    // if the startOfWeek isn't Sunday, we can just subtract by 1
+                    lastDayOfWeek = firstDayOfWeek - 1;
+                }
+                
+                DateTime sundayDate;
+
+                if ( lastDayOfWeek < dateTime.DayOfWeek )
+                {
+                    // If the lastDayOfWeek after the current day of week, we can simply add 
+                    sundayDate = dateTime.AddDays( sundayDiff );
+                }
+                else
+                {
+                    // If the current DayOfWeek is on or after the lastDayOfWeek, it'll be the *previous* Sunday.
+                    // For example, if the Last Day of the Week is Monday (10/7/2019),
+                    // the Sunday Date will *before* the current date (10/6/2019)
+                    sundayDate = dateTime.AddDays( sundayDiff - 7);
+                }
+
+                return sundayDate.Date;
+            }
         }
     }
 }

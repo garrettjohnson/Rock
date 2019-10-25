@@ -1,9 +1,8 @@
 set nocount on
 DECLARE @crlf varchar(2) = char(13) + char(10)
 
-BEGIN
-
-DECLARE @JobId int = 32
+-- specify the Id of the ServiceJob to create a migration for
+DECLARE @JobId int = 7
 
 IF OBJECT_ID('tempdb..#codeTable') IS NOT NULL
     DROP TABLE #codeTable
@@ -19,6 +18,8 @@ create table #codeTable (
     SELECT 
 		'            // add ' + ISNULL('ServiceJob: ' + p.Name,'') +
         @crlf + 
+		'            // Code Generated using Rock\Dev Tools\Sql\CodeGen_ServiceJobWithAttributes_ForAJob.sql' +
+		@crlf + 
 		'            Sql(@"IF NOT EXISTS( SELECT [Id] FROM [ServiceJob] WHERE [Class] = ''' + p.[Class] + ''' AND [Guid] = ''' + ISNULL(CONVERT( nvarchar(50), [p].[Guid]),'') + ''' )' +
 		@crlf + 
 		'            BEGIN' + @crlf + 
@@ -49,30 +50,30 @@ create table #codeTable (
 	INSERT INTO #codeTable
     SELECT @crlf
 
-	-- RockMigrationHelper.UpdateEntityAttribute( "Rock.Model.ServiceJob", "08F3003B-F3E2-41EC-BDF1-A2B7AC2908CF", "Class", "Rock.Jobs.SendCreditCardExpirationNotices", "Expiring Credit Card Email", "The system email template to use for the credit card expiration notice. The attributes 'Person', 'Card' (the last four digits of the credit card), and 'Expiring' (the MM/YYYY of expiration) will be passed to the email.", 0, "C07ACD2E-7B9D-400A-810F-BC0EBB9A60DD", "074E32E2-99E3-4962-80C3-4025CC934AB1", "ExpiringCreditCardEmail" );
-
     -- Add the service job attributes
+	--AddOrUpdateEntityAttribute( string entityTypeName, string fieldTypeGuid, string entityTypeQualifierColumn
+	--, string entityTypeQualifierValue, string name, string abbreviatedName, string description, int order, string defaultValue, string guid, string key )
     INSERT INTO #codeTable
-    SELECT 
-        '            RockMigrationHelper.UpdateEntityAttribute( "Rock.Model.ServiceJob", "'+ 
-        CONVERT(nvarchar(50), ft.[Guid])+ '", "'+
-		'Class", '+
-		'"'+ a.[EntityTypeQualifierValue] + '", "' +
-		a.[Name] + '", "'+  
-        ISNULL(a.[Description],'')+ '", '+ 
-        CONVERT(varchar, a.[Order])+ ', @"'+ 
-		ISNULL(a.[DefaultValue],'')+ '", "'+
-        CONVERT(nvarchar(50), a.[Guid])+ '", "' +
-		a.[Key]+ '" );' +
-        @crlf
-    FROM [Attribute] a
+    SELECT
+		  '            // Attribute: ' + [a].[EntityTypeQualifierValue] + ': ' + [a].[Name] + @crlf
+		+ '            RockMigrationHelper.AddOrUpdateEntityAttribute( '
+		+ '"Rock.Model.ServiceJob", '										-- EntityTypeName
+		+ '"' + CONVERT(NVARCHAR(50), [ft].[Guid]) + '", '					-- FieldType.Guid
+		+ '"Class", '														-- Attribute.EntityTypeQualifierColumn
+		+ '"' + [a].[EntityTypeQualifierValue] + '", '						-- Attribute.EntityTypeQualifierValue
+		+ '"' + [a].[Name] + '", '						  					-- Attribute.Name
+		+ '"' + ISNULL([a].[AbbreviatedName], '') + '", '					-- Attribute.AbbreviatedName
+		+ '@"'+ ISNULL(REPLACE([a].[Description], '"', '""'),'') + '", '	-- Attribute.Description
+		+ CONVERT(VARCHAR, [a].[Order])+ ', '								-- Attribute.Order
+		+ '@"'+ ISNULL(REPLACE([a].[DefaultValue], '"', '""'),'') + '", '	-- Attribute.DefaultValue
+		+ '"' + CONVERT(NVARCHAR(50), [a].[Guid])+ '", '					-- Attribute.Guid
+		+ '"' + [a].[Key] + '" );'											-- Attribute.Key
+		+ @crlf
+	FROM [Attribute] a
 	JOIN [EntityType] e ON e.[Id] = a.[EntityTypeId]
-    JOIN [FieldType] [ft] ON [ft].[Id] = [a].[FieldTypeId]
-    WHERE a.[EntityTypeQualifierColumn] = 'Class'
-	AND a.[EntityTypeQualifierValue] in
-	(
-		SELECT [Class] FROM [ServiceJob] [p] WHERE [p].[Id] = @JobId
-	)
+	JOIN [FieldType] [ft] ON [ft].[Id] = [a].[FieldTypeId]
+	WHERE a.[EntityTypeQualifierColumn] = 'Class'
+		AND a.[EntityTypeQualifierValue] in (SELECT [Class] FROM [ServiceJob] [p] WHERE [p].[Id] = @JobId)
 	ORDER BY a.[Order]
 
 	-- Add the job attribute values
@@ -100,6 +101,8 @@ create table #codeTable (
 
 
     -- generate MigrationDown
+
+	INSERT INTO #codeTable select '            // Code Generated using Rock\Dev Tools\Sql\CodeGen_ServiceJobWithAttributes_ForAJob.sql' + @crlf
 
 	-- delete attributes
     INSERT INTO #codeTable SELECT         
@@ -141,6 +144,4 @@ create table #codeTable (
     ORDER BY [Id]
 
 IF OBJECT_ID('tempdb..#codeTable') IS NOT NULL
-    DROP TABLE #codeTable
-
-END
+    BEGIN DROP TABLE #codeTable END

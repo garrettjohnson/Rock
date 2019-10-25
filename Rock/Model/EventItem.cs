@@ -19,7 +19,6 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using System.Data.Entity;
 using System.Data.Entity.ModelConfiguration;
 using System.Linq;
 using System.Runtime.Serialization;
@@ -247,13 +246,13 @@ namespace Rock.Model
                 return null;
             }
 
-            var inheritedAttributes = new Dictionary<int, List<Rock.Web.Cache.AttributeCache>>();
-            calendarIds.ForEach( c => inheritedAttributes.Add( c, new List<Rock.Web.Cache.AttributeCache>() ) );
+            var inheritedAttributes = new Dictionary<int, List<AttributeCache>>();
+            calendarIds.ForEach( c => inheritedAttributes.Add( c, new List<AttributeCache>() ) );
 
             //
             // Check for any calendar item attributes that the event item inherits.
             //
-            var calendarItemEntityType = EntityTypeCache.Read( typeof( EventCalendarItem ) );
+            var calendarItemEntityType = EntityTypeCache.Get( typeof( EventCalendarItem ) );
             if ( calendarItemEntityType != null )
             {
                 foreach ( var calendarItemEntityAttributes in AttributeCache
@@ -265,7 +264,7 @@ namespace Rock.Model
                     foreach ( var attributeId in calendarItemEntityAttributes.AttributeIds )
                     {
                         inheritedAttributes[calendarItemEntityAttributes.EntityTypeQualifierValue.AsInteger()].Add(
-                            AttributeCache.Read( attributeId ) );
+                            AttributeCache.Get( attributeId ) );
                     }
                 }
             }
@@ -274,7 +273,7 @@ namespace Rock.Model
             // Walk the generated list of attribute groups and put them, ordered, into a list
             // of inherited attributes.
             //
-            var attributes = new List<Rock.Web.Cache.AttributeCache>();
+            var attributes = new List<AttributeCache>();
             foreach ( var attributeGroup in inheritedAttributes )
             {
                 foreach ( var attribute in attributeGroup.Value.OrderBy( a => a.Order ) )

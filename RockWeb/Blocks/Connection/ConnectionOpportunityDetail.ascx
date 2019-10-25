@@ -20,7 +20,7 @@
 
             <div class="panel panel-block">
 
-                <div class="panel-heading clearfix">
+                <div class="panel-heading">
                     <h1 class="panel-title pull-left">
                         <asp:Literal ID="lIcon" runat="server" />
                         <asp:Literal ID="lReadOnlyTitle" runat="server" />
@@ -32,6 +32,10 @@
                 </div>
                 <Rock:PanelDrawer ID="pdAuditDetails" runat="server"></Rock:PanelDrawer>
                 <div class="panel-body">
+                    <Rock:NotificationBox ID="nbArchivedPlacementGroupWarning" runat="server" NotificationBoxType="Warning" Text="One or more placement groups on this opportunity have been archived." Visible="false" />
+
+                    <Rock:NotificationBox ID="nbArchivedConnectorGroupWarning" runat="server" NotificationBoxType="Warning" Text="One or more connector groups on this opportunity have been archived." Visible="false" />
+
                     <Rock:NotificationBox ID="nbEditModeMessage" runat="server" NotificationBoxType="Info" />
 
                     <Rock:NotificationBox ID="nbIncorrectOpportunity" runat="server" NotificationBoxType="Danger" Visible="false"
@@ -42,7 +46,7 @@
 
                     <Rock:NotificationBox ID="nbInvalidGroupTypes" runat="server" NotificationBoxType="Danger" Visible="false" Heading="Groups" />
 
-                    <asp:ValidationSummary ID="vsSummary" runat="server" HeaderText="Please Correct the Following" CssClass="alert alert-danger" />
+                    <asp:ValidationSummary ID="vsSummary" runat="server" HeaderText="Please correct the following:" CssClass="alert alert-validation" />
 
                     <div id="pnlEditDetails" runat="server">
 
@@ -104,7 +108,14 @@
                             <div class="grid">
                                 <Rock:Grid ID="gConnectionOpportunityGroups" runat="server" AllowPaging="false" DisplayType="Light" RowItemText="Group" ShowConfirmDeleteDialog="false">
                                     <Columns>
-                                        <Rock:RockBoundField DataField="GroupName" HeaderText="Name" />
+                                        <Rock:RockTemplateField HeaderText="Name">
+                                            <ItemTemplate>
+                                                <asp:Literal ID="lGroupName" runat="server" Text='<%# Eval("GroupName") %>' />
+                                                <asp:Literal ID="lArchivedWarning" runat="server" Visible='<%# Eval("IsArchived") %>'>
+                                                    <span class="label label-warning">Archived</span>
+                                                </asp:Literal>
+                                            </ItemTemplate>
+                                        </Rock:RockTemplateField>
                                         <Rock:RockBoundField DataField="GroupTypeName" HeaderText="Group Type" />
                                         <Rock:RockBoundField DataField="CampusName" HeaderText="Campus" />
                                         <Rock:DeleteField OnClick="gConnectionOpportunityGroups_Delete" />
@@ -119,7 +130,14 @@
                                     <div class="grid">
                                         <Rock:Grid ID="gConnectionOpportunityConnectorGroups" runat="server" AllowPaging="false" DisplayType="Light" RowItemText="Campus Connector Group" ShowConfirmDeleteDialog="false">
                                             <Columns>
-                                                <Rock:RockBoundField DataField="GroupName" HeaderText="Group" />
+                                                <Rock:RockTemplateField HeaderText="Group">
+                                                    <ItemTemplate>
+                                                        <asp:Literal ID="lGroupName" runat="server" Text='<%# Eval("GroupName") %>' />
+                                                        <asp:Literal ID="lArchivedWarning" runat="server" Visible='<%# Eval("IsArchived") %>'>
+                                                            <span class="label label-warning">Archived</span>
+                                                        </asp:Literal>
+                                                    </ItemTemplate>
+                                                </Rock:RockTemplateField>
                                                 <Rock:RockBoundField DataField="CampusName" HeaderText="Campus" />
                                                 <Rock:EditField OnClick="gConnectionOpportunityConnectorGroups_Edit" />
                                                 <Rock:DeleteField OnClick="gConnectionOpportunityConnectorGroups_Delete" />
@@ -140,7 +158,7 @@
 
                         <Rock:PanelWidget ID="wpConnectionOpportunityWorkflow" runat="server" Title="Workflows">
                             <div class="grid">
-                                <Rock:Grid ID="gConnectionOpportunityWorkflows" runat="server" AllowPaging="false" DisplayType="Light" RowItemText="Workflow" 
+                                <Rock:Grid ID="gConnectionOpportunityWorkflows" runat="server" AllowPaging="false" DisplayType="Light" RowItemText="Workflow"
                                     ShowConfirmDeleteDialog="false" OnRowDataBound="gConnectionOpportunityWorkflows_RowDataBound">
                                     <Columns>
                                         <Rock:RockBoundField DataField="WorkflowTypeName" HeaderText="Workflow Type" HtmlEncode="false" />
@@ -169,11 +187,11 @@
 
                 <asp:HiddenField ID="hfWorkflowGuid" runat="server" />
 
-                <asp:ValidationSummary ID="valWorkflowDetails" runat="server" HeaderText="Please Correct the Following" CssClass="alert alert-danger" ValidationGroup="WorkflowDetails" />
+                <asp:ValidationSummary ID="valWorkflowDetails" runat="server" HeaderText="Please correct the following:" CssClass="alert alert-validation" ValidationGroup="WorkflowDetails" />
 
                 <div class="row">
                     <div class="col-md-6">
-                        <Rock:RockDropDownList ID="ddlTriggerType" runat="server" Label="Launch Workflow When" 
+                        <Rock:RockDropDownList ID="ddlTriggerType" runat="server" Label="Launch Workflow When"
                             OnSelectedIndexChanged="ddlTriggerType_SelectedIndexChanged" AutoPostBack="true" Required="true" ValidationGroup="WorkflowDetails" >
                             <asp:ListItem Value="0" Text="Request Started" />
                             <asp:ListItem Value="8" Text="Request Assigned" />
@@ -187,8 +205,7 @@
                         </Rock:RockDropDownList>
                     </div>
                     <div class="col-md-6">
-                        <Rock:RockDropDownList ID="ddlWorkflowType" runat="server" Label="Workflow Type" DataTextField="Name" DataValueField="Id" 
-                            Required="true" ValidationGroup="WorkflowDetails" EnhanceForLongLists="true" />
+                        <Rock:WorkflowTypePicker ID="wpWorkflowType" runat="server" Label="Workflow Type" Required="true" ValidationGroup="WorkflowDetails"/>
                     </div>
                 </div>
 
@@ -206,7 +223,7 @@
 
         <Rock:ModalDialog ID="dlgGroupDetails" runat="server" ValidationGroup="GroupDetails" SaveButtonText="Add" OnSaveClick="dlgGroupDetails_SaveClick" Title="Select Group">
             <Content>
-                <asp:ValidationSummary ID="valGroupDetails" runat="server" HeaderText="Please Correct the Following" CssClass="alert alert-danger" ValidationGroup="GroupDetails" />
+                <asp:ValidationSummary ID="valGroupDetails" runat="server" HeaderText="Please correct the following:" CssClass="alert alert-validation" ValidationGroup="GroupDetails" />
                 <Rock:NotificationBox ID="nbInvalidGroupType" runat="server" NotificationBoxType="Danger" Visible="false" Heading="Group Type" />
                 <Rock:GroupPicker ID="gpOpportunityGroup" runat="server" Label="Select Group" AllowMultiSelect="true" ValidationGroup="GroupDetails" />
             </Content>
@@ -214,7 +231,7 @@
 
         <Rock:ModalDialog ID="dlgGroupConfigDetails" runat="server" ValidationGroup="GroupConfig" SaveButtonText="Add" OnSaveClick="dlgGroupConfigDetails_SaveClick" Title="Placement Group Configuration">
             <Content>
-                <asp:ValidationSummary ID="valGroupConfig" runat="server" HeaderText="Please Correct the Following" CssClass="alert alert-danger" ValidationGroup="GroupConfig" />
+                <asp:ValidationSummary ID="valGroupConfig" runat="server" HeaderText="Please correct the following:" CssClass="alert alert-validation" ValidationGroup="GroupConfig" />
                 <asp:HiddenField ID="hfGroupConfigGuid" runat="server" />
                 <div class="row">
                     <div class="col-md-4">
@@ -242,7 +259,7 @@
 
         <Rock:ModalDialog ID="dlgConnectorGroupDetails" runat="server" ValidationGroup="ConnectorGroup" SaveButtonText="Add" OnSaveClick="dlgConnectorGroupDetails_SaveClick" Title="Select Group">
             <Content>
-                <asp:ValidationSummary ID="valConnectorGroup" runat="server" HeaderText="Please Correct the Following" CssClass="alert alert-danger" ValidationGroup="ConnectorGroup" />
+                <asp:ValidationSummary ID="valConnectorGroup" runat="server" HeaderText="Please correct the following:" CssClass="alert alert-validation" ValidationGroup="ConnectorGroup" />
                 <asp:HiddenField ID="hfConnectorGroupGuid" runat="server" />
                 <div class="row">
                     <div class="col-md-6">

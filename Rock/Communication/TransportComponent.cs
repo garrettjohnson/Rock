@@ -16,13 +16,11 @@
 //
 using System;
 using System.Collections.Generic;
-using System.Data.Entity;
 using System.Net.Mail;
 using System.Linq;
 
 using Rock.Extension;
 using Rock.Model;
-using Rock.Web.Cache;
 
 namespace Rock.Communication
 {
@@ -82,18 +80,7 @@ namespace Rock.Communication
                     recipient.StatusNote = "Person is deceased";
                     valid = false;
                 }
-                else if ( person.EmailPreference == Model.EmailPreference.DoNotEmail )
-                {
-                    recipient.Status = CommunicationRecipientStatus.Failed;
-                    recipient.StatusNote = "Communication Preference of 'Do Not Send Communication'";
-                    valid = false;
-                }
-                else if ( person.EmailPreference == Model.EmailPreference.NoMassEmails && isBulkCommunication )
-                {
-                    recipient.Status = CommunicationRecipientStatus.Failed;
-                    recipient.StatusNote = "Communication Preference of 'No Bulk Communication'";
-                    valid = false;
-                }
+
                 else if ( recipient.Communication.ListGroupId.HasValue  )
                 {
                     // if this communication is being sent to a list, make sure the recipient is still an active member of the list
@@ -141,12 +128,12 @@ namespace Rock.Communication
             string value = content.ResolveMergeFields( mergeFields, person, enabledLavaCommands );
             value = value.ReplaceWordChars();
 
-            if ( themeRoot.IsNotNullOrWhitespace() )
+            if ( themeRoot.IsNotNullOrWhiteSpace() )
             {
                 value = value.Replace( "~~/", themeRoot );
             }
 
-            if ( appRoot.IsNotNullOrWhitespace() )
+            if ( appRoot.IsNotNullOrWhiteSpace() )
             {
                 value = value.Replace( "~/", appRoot );
                 value = value.Replace( @" src=""/", @" src=""" + appRoot );
@@ -158,13 +145,38 @@ namespace Rock.Communication
             return value;
         }
 
+        /// <summary>
+        /// Resolves the text and adds it to the CommunicationRecipient.SentMessage object.
+        /// Don't forget to call RockContext.SaveChanges() to persist to the DB.
+        /// </summary>
+        /// <param name="content">The content.</param>
+        /// <param name="person">The person.</param>
+        /// <param name="enabledLavaCommands">The enabled lava commands.</param>
+        /// <param name="mergeFields">The merge fields.</param>
+        /// <param name="communicationRecipient">The communication recipient.</param>
+        /// <param name="appRoot">The application root.</param>
+        /// <param name="themeRoot">The theme root.</param>
+        /// <returns></returns>
+        public virtual string ResolveText( string content, Person person, CommunicationRecipient communicationRecipient, string enabledLavaCommands, Dictionary<string, object> mergeFields, string appRoot = "", string themeRoot = "" )
+        {
+            string value = ResolveText( content, person, enabledLavaCommands, mergeFields, appRoot, themeRoot );
+
+            if ( communicationRecipient != null )
+            {
+                communicationRecipient.SentMessage = value;
+            }
+
+            return value;
+        }
+
         #region Obsolete
 
         /// <summary>
         /// Sends the specified communication.
         /// </summary>
         /// <param name="communication">The communication.</param>
-        [Obsolete( "Use Send( Communication communication, Dictionary<string, string> mediumAttributes ) instead" )]
+        [RockObsolete( "1.7" )]
+        [Obsolete( "Use Send( Communication communication, Dictionary<string, string> mediumAttributes ) instead", true )]
         public abstract void Send( Model.Communication communication );
 
         /// <summary>
@@ -174,7 +186,8 @@ namespace Rock.Communication
         /// <param name="recipients">The recipients.</param>
         /// <param name="appRoot">The application root.</param>
         /// <param name="themeRoot">The theme root.</param>
-        [Obsolete( "Use Send( RockMessage message, out List<string> errorMessage ) method instead" )]
+        [RockObsolete( "1.7" )]
+        [Obsolete( "Use Send( RockMessage message, out List<string> errorMessage ) method instead", true )]
         public abstract void Send( SystemEmail template, List<RecipientData> recipients, string appRoot, string themeRoot );
 
         /// <summary>
@@ -184,7 +197,8 @@ namespace Rock.Communication
         /// <param name="recipients">The recipients.</param>
         /// <param name="appRoot">The application root.</param>
         /// <param name="themeRoot">The theme root.</param>
-        [Obsolete( "Use Send( RockMessage message, out List<string> errorMessage ) method instead" )]
+        [RockObsolete( "1.7" )]
+        [Obsolete( "Use Send( RockMessage message, out List<string> errorMessage ) method instead", true )]
         public abstract void Send(Dictionary<string, string> mediumData, List<string> recipients, string appRoot, string themeRoot);
 
         /// <summary>
@@ -196,7 +210,8 @@ namespace Rock.Communication
         /// <param name="body">The body.</param>
         /// <param name="appRoot">The application root.</param>
         /// <param name="themeRoot">The theme root.</param>
-        [Obsolete( "Use Send( RockMessage message, out List<string> errorMessage ) method instead" )]
+        [RockObsolete( "1.7" )]
+        [Obsolete( "Use Send( RockMessage message, out List<string> errorMessage ) method instead", true )]
         public abstract void Send(List<string> recipients, string from, string subject, string body, string appRoot = null, string themeRoot = null);
 
         /// <summary>
@@ -209,7 +224,8 @@ namespace Rock.Communication
         /// <param name="appRoot">The application root.</param>
         /// <param name="themeRoot">The theme root.</param>
         /// /// <param name="attachments">Attachments.</param>
-        [Obsolete( "Use Send( RockMessage message, out List<string> errorMessage ) method instead" )]
+        [RockObsolete( "1.7" )]
+        [Obsolete( "Use Send( RockMessage message, out List<string> errorMessage ) method instead", true )]
         public abstract void Send(List<string> recipients, string from, string subject, string body, string appRoot = null, string themeRoot = null, List<Attachment> attachments = null);
 
 
@@ -224,7 +240,8 @@ namespace Rock.Communication
         /// <param name="appRoot">The application root.</param>
         /// <param name="themeRoot">The theme root.</param>
         /// <param name="attachments">The attachments.</param>
-        [Obsolete( "Use Send( RockMessage message, out List<string> errorMessage ) method instead" )]
+        [RockObsolete( "1.7" )]
+        [Obsolete( "Use Send( RockMessage message, out List<string> errorMessage ) method instead", true )]
         public abstract void Send( List<string> recipients, string from, string fromName, string subject, string body, string appRoot = null, string themeRoot = null, List<Attachment> attachments = null );
 
         #endregion

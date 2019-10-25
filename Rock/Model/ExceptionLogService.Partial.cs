@@ -15,12 +15,13 @@
 // </copyright>
 //
 using System;
-using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Web;
+using Rock.Data;
 
 namespace Rock.Model
 {
@@ -29,6 +30,17 @@ namespace Rock.Model
     /// </summary>
     public partial class ExceptionLogService 
     {
+        #region Fields
+
+        /// <summary>
+        /// When true, indicates that exceptions should always be logged to file in addition to the database.
+        /// </summary>
+        public static bool AlwaysLogToFile = false;
+
+        #endregion
+
+        #region Queries
+
         /// <summary>
         /// Gets a collection of <see cref="Rock.Model.ExceptionLog"/> entities by the Id of their Parent exceptionId. 
         /// Under most instances, only one child <see cref="Rock.Model.ExceptionLog"/> entity will be returned in the collection.
@@ -60,6 +72,72 @@ namespace Rock.Model
             return Queryable().Where( t => ( t.SiteId == siteId || ( siteId == null && t.SiteId == null ) ) );
         }
 
+        #endregion
+
+        #region Filters
+
+        ///
+        /// TODO: To allow a fluent style of filter composition, these filters should be implemented as extension methods in a separate class.
+        ///
+
+        /// <summary>
+        /// Specifies the number of prefix characters of the Exception Message property that are examined when grouping similar exceptions.
+        /// </summary>
+        public static readonly int DescriptionGroupingPrefixLength = 28;
+
+        /// <summary>
+        /// Filter a query for exceptions at the innermost or lowest level of the exception hierarchy.
+        /// </summary>
+        /// <returns></returns>
+        public IQueryable<ExceptionLog> FilterByInnermost( IQueryable<ExceptionLog> query )
+        {
+            query = query.Where( e => e.HasInnerException == null || e.HasInnerException == false );
+
+            return query;
+        }
+
+        /// <summary>
+        /// Filter a query for exceptions at the outermost or highest level of the exception hierarchy.
+        /// </summary>
+        /// <returns></returns>
+        public IQueryable<ExceptionLog> FilterByOutermost( IQueryable<ExceptionLog> query )
+        {
+            query = query.Where( e => e.ParentId == null );
+
+            return query;
+        }
+
+        /// <summary>
+        /// Filter a query for exceptions having a description matching the specified prefix.
+        /// </summary>
+        /// <param name="query">The query.</param>
+        /// <param name="descriptionPrefix">The description prefix.</param>
+        /// <returns></returns>
+        public IQueryable<ExceptionLog> FilterByDescriptionPrefix( IQueryable<ExceptionLog> query, string descriptionPrefix )
+        {
+            if ( !string.IsNullOrEmpty( descriptionPrefix ) )
+            {
+                descriptionPrefix = descriptionPrefix.Substring( 0, Math.Min( descriptionPrefix.Length, DescriptionGroupingPrefixLength ) );
+
+                query = query.Where( e => e.Description.Substring( 0, DescriptionGroupingPrefixLength ) == descriptionPrefix );
+            }
+
+            return query;
+        }
+
+        #endregion
+
+        #region Operations
+
+        /// <summary>
+        /// Remove all records from the Exception Log.
+        /// </summary>
+        public void TruncateLog()
+        {
+            int recordsDeleted = DbService.ExecuteCommand( "TRUNCATE TABLE ExceptionLog" );
+
+            //TODO: We should record the log truncation action in an appropriate application log.
+        }
 
         /// <summary>
         /// Logs new <see cref="Rock.Model.ExceptionLog" /> entities.  This method serves as an interface to asynchronously log exceptions.
@@ -102,6 +180,15 @@ namespace Rock.Model
         }
 
         /// <summary>
+        /// Log an exception.
+        /// </summary>
+        /// <param name="message">The exception message.</param>
+        public static void LogException( string message )
+        {
+            LogException( new Exception( message ) );
+        }
+
+        /// <summary>
         /// Recursively logs exception and any children.
         /// </summary>
         /// <param name="ex">The <see cref="System.Exception"/> to log.</param>
@@ -111,6 +198,8 @@ namespace Rock.Model
         /// </param>
         private static void LogExceptions( Exception ex, ExceptionLog log, bool isParent )
         {
+            bool logToFile = AlwaysLogToFile;
+
             // First, attempt to log exception to the database.
             try
             {
@@ -156,8 +245,8 @@ namespace Rock.Model
                     var exceptionLogService = new ExceptionLogService( rockContext );
                     exceptionLogService.Add( exceptionLog );
 
-                    // call SaveChanges with 'disablePrePostProcessing=true' just in case the pre/post processing would also cause exceptions
-                    rockContext.SaveChanges( true );
+                    // make sure to call the regular SaveChanges so that CreatedBy,CreatedByDateTime, etc get set properly. If any of the post processing happens to also create an exception, we can just log to the exception file instead
+                    rockContext.SaveChanges();
                 }
 
                 // Recurse if inner exception is found
@@ -180,6 +269,11 @@ namespace Rock.Model
             catch ( Exception )
             {
                 // If logging the exception fails, write the exceptions to a file
+                logToFile = true;
+            }
+
+            if ( logToFile )
+            {
                 try
                 {
                     string directory = AppDomain.CurrentDomain.BaseDirectory;
@@ -204,6 +298,8 @@ namespace Rock.Model
                 }
             }
         }
+
+        #endregion
 
         /// <summary>
         /// Populates the <see cref="Rock.Model.ExceptionLog" /> entity with the exception data.
@@ -260,20 +356,14 @@ namespace Rock.Model
                     var stackTrace = new System.Diagnostics.StackTrace( 2 );
                     exceptionLog.StackTrace = stackTrace.ToString();
                 }
-                catch
-                {
-                    // ignore
-                }
+                catch { }
             }
 
             try
             {
                 ex.Data.Add( "ExceptionLogGuid", exceptionLog.Guid );
             }
-            catch
-            {
-                // ignore
-            }
+            catch { }
 
             try
             {
@@ -311,7 +401,7 @@ namespace Rock.Model
                     formItems.Append( "<table class=\"form-items exception-table\">" );
                     foreach ( string formItem in formList )
                     {
-                        if ( formItem.IsNotNullOrWhitespace() )
+                        if ( formItem.IsNotNullOrWhiteSpace() )
                         {
                             string formValue = formList[formItem].EncodeHtml();
                             string lc = formItem.ToLower();
@@ -332,14 +422,32 @@ namespace Rock.Model
                 }
 
                 StringBuilder serverVars = new StringBuilder();
-                var serverVarList = request.ServerVariables;
+
+                // 'serverVarList[serverVar]' throws an exception if the value is empty, even if the key exists,
+                // so make a copy of the request server variables to help avoid that error
+                var serverVarList = new NameValueCollection( request.ServerVariables );
+                var serverVarListString = serverVarList.ToString();
+
+                var serverVarKeys = request.ServerVariables.AllKeys;
 
                 if ( serverVarList.Count > 0 )
                 {
                     serverVars.Append( "<table class=\"server-variables exception-table\">" );
 
                     foreach ( string serverVar in serverVarList )
-                        serverVars.Append( "<tr><td><b>" + serverVar + "</b></td><td>" + serverVarList[serverVar].EncodeHtml() + "</td></tr>" );
+                    {
+                        string val = string.Empty;
+                        try
+                        {
+                            val = serverVarList[serverVar].ToStringSafe().EncodeHtml();
+                        }
+                        catch
+                        {
+                            // ignore
+                        }
+
+                        serverVars.Append( $"<tr><td><b>{serverVar}</b></td><td>{val}</td></tr>" );
+                    }
 
                     serverVars.Append( "</table>" );
                 }
@@ -351,9 +459,7 @@ namespace Rock.Model
                 exceptionLog.QueryString = request.Url.Query;
                 exceptionLog.Form = formItems.ToString();
             }
-            catch { 
-                // Intentionally do nothing
-            }
+            catch { }
 
             return exceptionLog;
         }

@@ -25,8 +25,9 @@ using System.Runtime.Serialization;
 
 using Newtonsoft.Json;
 
-using Rock.Data;
 using Rock.Communication;
+using Rock.Data;
+using Rock.Security;
 
 namespace Rock.Model
 {
@@ -36,7 +37,7 @@ namespace Rock.Model
     [RockDomain( "Communication" )]
     [Table( "CommunicationTemplate" )]
     [DataContract]
-    public partial class CommunicationTemplate : Model<CommunicationTemplate>, ICommunicationDetails
+    public partial class CommunicationTemplate : Model<CommunicationTemplate>, ICommunicationDetails, ICampusFilterable
     {
 
         #region Entity Properties
@@ -138,7 +139,8 @@ namespace Rock.Model
         /// <value>
         /// A Json formatted <see cref="System.String"/> that contains any Medium specific data.
         /// </value>
-        [Obsolete( "MediumDataJson is no longer used." )]
+        [RockObsolete( "1.7" )]
+        [Obsolete( "MediumDataJson is no longer used.", true )]
         public string MediumDataJson { get; set; }
 
         #region Email Fields
@@ -150,7 +152,7 @@ namespace Rock.Model
         /// A <see cref="System.String"/> that represents the name of the communication.
         /// </value>
         [DataMember]
-        [MaxLength( 100 )]
+        [MaxLength( 1000 )]
         public string Subject { get; set; }
 
         /// <summary>
@@ -335,6 +337,15 @@ namespace Rock.Model
         public virtual PersonAlias SenderPersonAlias { get; set; }
 
         /// <summary>
+        /// Gets a value indicating whether this instance is personal (has a SenderPersonAliasId value) or not
+        /// </summary>
+        /// <value>
+        ///   <c>true</c> if this instance is personal; otherwise, <c>false</c>.
+        /// </value>
+        [DataMember]
+        public virtual bool IsPersonal => SenderPersonAliasId.HasValue;
+
+        /// <summary>
         /// Gets or sets the logo binary file that email messages using this template can use for the logo in the message content
         /// </summary>
         /// <value>
@@ -386,7 +397,8 @@ namespace Rock.Model
         /// </value>
         [DataMember]
         [NotMapped]
-        [Obsolete( "MediumData is no longer used. Communication Template now has specific properties for medium data." )]
+        [RockObsolete( "1.7" )]
+        [Obsolete( "MediumData is no longer used. Communication Template now has specific properties for medium data.", true )]
         public virtual Dictionary<string, string> MediumData
         {
             get
@@ -399,7 +411,7 @@ namespace Rock.Model
                     mediumData.AddIfNotBlank( "Subject", Subject );
                     mediumData.AddIfNotBlank( "Message", SMSMessage );
                 }
-                else if ( PushMessage.IsNotNullOrWhitespace() )
+                else if ( PushMessage.IsNotNullOrWhiteSpace() )
                 {
                     mediumData.AddIfNotBlank( "Title", PushTitle );
                     mediumData.AddIfNotBlank( "Message", PushMessage );
@@ -439,7 +451,8 @@ namespace Rock.Model
         /// The attachment binary file ids
         /// </value>
         [NotMapped]
-        [Obsolete( "Use EmailAttachmentBinaryFileIds or SMSAttachmentBinaryFileIds" )]
+        [RockObsolete( "1.7" )]
+        [Obsolete( "Use EmailAttachmentBinaryFileIds or SMSAttachmentBinaryFileIds", true )]
         public virtual IEnumerable<int> AttachmentBinaryFileIds
         {
             get
@@ -510,7 +523,8 @@ namespace Rock.Model
         /// </summary>
         /// <param name="key">A <see cref="System.String"/> containing the key associated with the value to retrieve. </param>
         /// <returns>A <see cref="System.String"/> representing the value that is linked with the specified key.</returns>
-        [Obsolete( "MediumData is no longer used" )]
+        [RockObsolete( "1.7" )]
+        [Obsolete( "MediumData is no longer used", true )]
         public string GetMediumDataValue( string key )
         {
             if ( MediumData.ContainsKey( key ) )
@@ -528,7 +542,8 @@ namespace Rock.Model
         /// </summary>
         /// <param name="key">A <see cref="System.String"/> representing the key.</param>
         /// <param name="value">A <see cref="System.String"/> representing the value.</param>
-        [Obsolete( "MediumData is no longer used" )]
+        [RockObsolete( "1.7" )]
+        [Obsolete( "MediumData is no longer used", true )]
         public void SetMediumDataValue( string key, string value )
         {
             if ( MediumData.ContainsKey( key ) )
@@ -564,6 +579,8 @@ namespace Rock.Model
                 return false;
             }
 
+            templateHtml = templateHtml.ResolveMergeFields( Rock.Lava.LavaHelper.GetCommonMergeFields( null ) );
+
             HtmlAgilityPack.HtmlDocument templateDoc = new HtmlAgilityPack.HtmlDocument();
             templateDoc.LoadHtml( templateHtml );
 
@@ -585,22 +602,9 @@ namespace Rock.Model
         }
 
         /// <summary>
-        /// A parent authority.  If a user is not specifically allowed or denied access to
-        /// this object, Rock will check the default authorization on the current type, and
-        /// then the authorization on the Rock.Security.GlobalDefault entity
+        /// When checking for security, if a template does not have specific rules, first check the category it belongs to, but then check the default entity security for templates.
         /// </summary>
-        public override Security.ISecured ParentAuthority
-        {
-            get
-            {
-                if ( this.Category != null )
-                {
-                    return this.Category;
-                }
-
-                return base.ParentAuthority;
-            }
-        }
+        public override ISecured ParentAuthorityPre => this.Category ?? base.ParentAuthority;
 
         #endregion
 

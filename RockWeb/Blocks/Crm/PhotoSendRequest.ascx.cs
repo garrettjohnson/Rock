@@ -29,6 +29,7 @@ using Rock.Web.Cache;
 using Rock.Web.UI.Controls;
 using Rock.Attribute;
 using Rock.Communication;
+using System.Data.Entity;
 
 namespace RockWeb.Blocks.Crm
 {
@@ -174,7 +175,7 @@ namespace RockWeb.Blocks.Crm
                         }
                         testRecipient.Status = CommunicationRecipientStatus.Pending;
                         testRecipient.PersonAliasId = CurrentPersonAliasId.Value;
-                        testRecipient.MediumEntityTypeId = EntityTypeCache.Read( Rock.SystemGuid.EntityType.COMMUNICATION_MEDIUM_EMAIL.AsGuid() ).Id;
+                        testRecipient.MediumEntityTypeId = EntityTypeCache.Get( Rock.SystemGuid.EntityType.COMMUNICATION_MEDIUM_EMAIL.AsGuid() ).Id;
                         testCommunication.Recipients.Add( testRecipient );
 
                         var communicationService = new CommunicationService( rockContext );
@@ -336,13 +337,13 @@ namespace RockWeb.Blocks.Crm
             var familyGroupType = GroupTypeCache.GetFamilyGroupType();
             List<int> selectedRoleIds = cblRoles.SelectedValuesAsInt;
 
-            var selectedConnectionStatuses = cblConnectionStatus.SelectedValuesAsInt;
+            var selectedConnectionStatuses = dvpConnectionStatus.SelectedValuesAsInt;
             var ageBirthDate = RockDateTime.Now.AddYears( -nbAge.Text.AsInteger() );
             var photoUpdatedDate = RockDateTime.Now.AddYears( - nbUpdatedLessThan.Text.AsInteger() );
-            var people = personService.Queryable("Members", false, false);
+            var people = personService.Queryable( false, false ).Include( p => p.Members );
 
             // people opted out (or pending)
-            var peopleOptedOut = personService.Queryable( "Members", false, false )
+            var peopleOptedOut = personService.Queryable( false, false ).Include( p => p.Members )
                 .Where
                 (
                      p => p.Members.Where( gm => gm.Group.Guid == photoRequestGroup
@@ -352,8 +353,8 @@ namespace RockWeb.Blocks.Crm
             // people who have emails addresses
             people = people.Where( p => ! ( p.Email == null || p.Email.Trim() == string.Empty ) );
 
-            // people who match the Connection Status critera
-            people = people.Where( p => cblConnectionStatus.SelectedValuesAsInt.Contains( p.ConnectionStatusValueId ?? -1 ) );
+            // people who match the Connection Status criteria
+            people = people.Where( p => dvpConnectionStatus.SelectedValuesAsInt.Contains( p.ConnectionStatusValueId ?? -1 ) );
 
             // people who are old enough
             people = people.Where( p => p.BirthDate <= ageBirthDate );
@@ -395,7 +396,7 @@ namespace RockWeb.Blocks.Crm
                 // add each person as a recipient to the communication
                 if ( peopleIds != null )
                 {
-                    var emailMediumTypeId = EntityTypeCache.Read( Rock.SystemGuid.EntityType.COMMUNICATION_MEDIUM_EMAIL.AsGuid() ).Id;
+                    var emailMediumTypeId = EntityTypeCache.Get( Rock.SystemGuid.EntityType.COMMUNICATION_MEDIUM_EMAIL.AsGuid() ).Id;
 
                     foreach ( var personId in peopleIds )
                     {
@@ -451,13 +452,13 @@ namespace RockWeb.Blocks.Crm
         private void BindCheckBoxLists()
         {
             // roles...
-            var familyGroupType = GroupTypeCache.Read( Rock.SystemGuid.GroupType.GROUPTYPE_FAMILY.AsGuid() );
+            var familyGroupType = GroupTypeCache.Get( Rock.SystemGuid.GroupType.GROUPTYPE_FAMILY.AsGuid() );
             cblRoles.DataSource = familyGroupType.Roles;
             cblRoles.DataBind();
 
             // connection status...
             // NOTE: if we want to bind and preselect one or more items based on an attribute, we can do it like this
-            //var statuses = DefinedTypeCache.Read( Rock.SystemGuid.DefinedType.PERSON_CONNECTION_STATUS.AsGuid() ).DefinedValues
+            //var statuses = DefinedTypeCache.Get( Rock.SystemGuid.DefinedType.PERSON_CONNECTION_STATUS.AsGuid() ).DefinedValues
             //    .OrderBy( v => v.Order )
             //    .ThenBy( v => v.Value )
             //    .Select( v => new ListItem
@@ -474,7 +475,7 @@ namespace RockWeb.Blocks.Crm
             //}
 
             // otherwise we can just bind like this for now
-            cblConnectionStatus.BindToDefinedType( DefinedTypeCache.Read( Rock.SystemGuid.DefinedType.PERSON_CONNECTION_STATUS.AsGuid() ) );
+            dvpConnectionStatus.DefinedTypeId = DefinedTypeCache.Get( Rock.SystemGuid.DefinedType.PERSON_CONNECTION_STATUS.AsGuid() ).Id;
         }
 
         #endregion

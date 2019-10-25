@@ -35,7 +35,7 @@ namespace Rock.Client
         public int Id { get; set; }
 
         /// <summary />
-        public string AdditionalMergeFieldsJson { get; set; }
+        public string AdditionalMergeFieldsJson { get; set; } = @"[]";
 
         /// <summary />
         public string BCCEmails { get; set; }
@@ -51,6 +51,9 @@ namespace Rock.Client
 
         /// <summary />
         public string EnabledLavaCommands { get; set; }
+
+        /// <summary />
+        public bool ExcludeDuplicateRecipientAddress { get; set; }
 
         /// <summary />
         public Guid? ForeignGuid { get; set; }
@@ -72,6 +75,11 @@ namespace Rock.Client
 
         /// <summary />
         public int? ListGroupId { get; set; }
+
+        /// <summary />
+        // Made Obsolete in Rock "1.7"
+        [Obsolete( "MediumDataJson is no longer used.", true )]
+        public string MediumDataJson { get; set; }
 
         /// <summary />
         public string Message { get; set; }
@@ -113,6 +121,9 @@ namespace Rock.Client
 
         /// <summary />
         public string Segments { get; set; }
+
+        /// <summary />
+        public DateTime? SendDateTime { get; set; }
 
         /// <summary />
         public int? SenderPersonAliasId { get; set; }
@@ -171,6 +182,7 @@ namespace Rock.Client
             this.CommunicationTemplateId = source.CommunicationTemplateId;
             this.CommunicationType = source.CommunicationType;
             this.EnabledLavaCommands = source.EnabledLavaCommands;
+            this.ExcludeDuplicateRecipientAddress = source.ExcludeDuplicateRecipientAddress;
             this.ForeignGuid = source.ForeignGuid;
             this.ForeignKey = source.ForeignKey;
             this.FromEmail = source.FromEmail;
@@ -191,6 +203,7 @@ namespace Rock.Client
             this.ReviewerPersonAliasId = source.ReviewerPersonAliasId;
             this.SegmentCriteria = source.SegmentCriteria;
             this.Segments = source.Segments;
+            this.SendDateTime = source.SendDateTime;
             this.SenderPersonAliasId = source.SenderPersonAliasId;
             this.SMSFromDefinedValueId = source.SMSFromDefinedValueId;
             this.SMSMessage = source.SMSMessage;

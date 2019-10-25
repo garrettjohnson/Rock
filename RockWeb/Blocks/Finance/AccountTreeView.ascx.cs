@@ -42,6 +42,8 @@ namespace RockWeb.Blocks.Finance
     [BooleanField( "Show Settings Panel", defaultValue: true, key: "ShowFilterOption", order: 2 )]
     [CustomDropdownListField( "Initial Active Setting", "Select whether to initially show all or just active accounts in the treeview", "0^All,1^Active", false, "1", "", 3 )]
     [LinkedPage( "Detail Page", order: 4 )]
+    [LinkedPage( "Order Top-Level Page", key: "OrderTopLevelPage", order: 5 )]
+    [BooleanField( "Use Public Name", "Determines if the public name to be displayed for accounts.", defaultValue: false, order: 6 )]
     public partial class AccountTreeView : RockBlock
     {
         #region Fields
@@ -64,7 +66,7 @@ namespace RockWeb.Blocks.Finance
 
             var detailPageReference = new Rock.Web.PageReference( GetAttributeValue( "DetailPage" ) );
 
-            // NOTE: if the detail page is the current page, use the current route instead of route specified in the DetailPage (to preserve old behavoir)
+            // NOTE: if the detail page is the current page, use the current route instead of route specified in the DetailPage (to preserve old behavior)
             if ( detailPageReference == null || detailPageReference.PageId == this.RockPage.PageId )
             {
                 hfPageRouteTemplate.Value = ( this.RockPage.RouteData.Route as System.Web.Routing.Route ).Url;
@@ -73,7 +75,7 @@ namespace RockWeb.Blocks.Finance
             else
             {
                 hfPageRouteTemplate.Value = string.Empty;
-                var pageCache = PageCache.Read( detailPageReference.PageId );
+                var pageCache = PageCache.Get( detailPageReference.PageId );
                 if ( pageCache != null )
                 {
                     var route = pageCache.PageRoutes.FirstOrDefault( a => a.Id == detailPageReference.RouteId );
@@ -92,16 +94,17 @@ namespace RockWeb.Blocks.Finance
 
             pnlConfigPanel.Visible = this.GetAttributeValue( "ShowFilterOption" ).AsBooleanOrNull() ?? false;
             pnlRolloverConfig.Visible = this.GetAttributeValue( "ShowFilterOption" ).AsBooleanOrNull() ?? false;
+            hfUsePublicName.Value = this.GetAttributeValue( "UsePublicName" ).AsBoolean( false ).ToTrueFalse();
 
             if ( pnlConfigPanel.Visible )
             {
-                var hideInactiveGroups = this.GetUserPreference( "HideInactiveGroups" ).AsBooleanOrNull();
-                if ( !hideInactiveGroups.HasValue )
+                var hideInactiveAccounts = this.GetUserPreference( "HideInactiveAccounts" ).AsBooleanOrNull();
+                if ( !hideInactiveAccounts.HasValue )
                 {
-                    hideInactiveGroups = this.GetAttributeValue( "InitialActiveSetting" ) == "1";
+                    hideInactiveAccounts = this.GetAttributeValue( "InitialActiveSetting" ) == "1";
                 }
 
-                tglHideInactiveAccounts.Checked = hideInactiveGroups ?? true;
+                tglHideInactiveAccounts.Checked = hideInactiveAccounts ?? true;
             }
             else
             {
@@ -280,18 +283,30 @@ namespace RockWeb.Blocks.Finance
             NavigateToLinkedPage( "DetailPage", qryParams );
         }
 
+        /// <summary>
+        /// Handles the Click event of the lbOrderTopLevelAccounts control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
+        protected void lbOrderTopLevelAccounts_Click( object sender, EventArgs e )
+        {
+            Dictionary<string, string> queryParams = new Dictionary<string, string>();
+            queryParams.Add( "TopLevel", "True" );
+            NavigateToLinkedPage( "OrderTopLevelPage", queryParams );
+        }
+
         #endregion
 
         #region Methods
 
         /// <summary>
-        /// Handles the CheckedChanged event of the tglHideInactiveGroups control.
+        /// Handles the CheckedChanged event of the tglHideInactiveAccounts control.
         /// </summary>
         /// <param name="sender">The source of the event.</param>
         /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
         protected void tglHideInactiveAccounts_CheckedChanged( object sender, EventArgs e )
         {
-            this.SetUserPreference( "HideInactiveGroups", tglHideInactiveAccounts.Checked.ToTrueFalse() );
+            this.SetUserPreference( "HideInactiveAccounts", tglHideInactiveAccounts.Checked.ToTrueFalse() );
 
             // reload the whole page
             NavigateToPage( this.RockPage.Guid, new Dictionary<string, string>() );

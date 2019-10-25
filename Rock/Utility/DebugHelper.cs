@@ -14,11 +14,13 @@
 // limitations under the License.
 // </copyright>
 //
+using System.Collections.Generic;
 using System.Data.Common;
 using System.Data.Entity.Infrastructure.Interception;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
+
 using Rock.Data;
 
 namespace Rock
@@ -32,6 +34,11 @@ namespace Rock
         /// The _call counts
         /// </summary>
         public static int _callCounts = 0;
+
+        /// <summary>
+        /// The call ms total
+        /// </summary>
+        public static double _callMSTotal = 0.00;
 
         private class DebugHelperUserState
         {
@@ -50,7 +57,15 @@ namespace Rock
             /// <value>
             /// The rock context.
             /// </value>
-            internal RockContext RockContext { get; set; }
+            internal List<System.Data.Entity.DbContext> DbContextList { get; set; } = new List<System.Data.Entity.DbContext>();
+
+            /// <summary>
+            /// Gets or sets a value indicating whether [enable for all database contexts].
+            /// </summary>
+            /// <value>
+            ///   <c>true</c> if [enable for all database contexts]; otherwise, <c>false</c>.
+            /// </value>
+            internal bool EnableForAllDbContexts { get; set; } = false;
 
             /// <summary>
             /// </summary>
@@ -128,7 +143,7 @@ namespace Rock
             private void CommandExecuting( DbCommand command, DbCommandInterceptionContext interceptionContext, out object userState )
             {
                 userState = null;
-                if ( RockContext != null && !interceptionContext.DbContexts.Any( a => a == RockContext ) )
+                if ( !interceptionContext.DbContexts.Any( a => this.DbContextList.Contains( a ) || this.EnableForAllDbContexts ) )
                 {
                     return;
                 }
@@ -139,7 +154,7 @@ namespace Rock
 
                 sbDebug.AppendLine( "\n" );
 
-                StackTrace st = new StackTrace( 1, true );
+                StackTrace st = new StackTrace( 2, true );
                 var frames = st.GetFrames().Where( a => a.GetFileName() != null );
 
                 sbDebug.AppendLine( string.Format( "/* Call# {0}*/", DebugHelper._callCounts ) );
@@ -155,6 +170,7 @@ namespace Rock
                         {
                             return string.Format( "@{0} {1}({2}) = '{3}'", p.ParameterName, p.SqlDbType, p.Size, p.SqlValue.ToString().Replace( "'", "''" ) );
                         }
+
                         if ( p.SqlDbType == System.Data.SqlDbType.Int )
                         {
                             return string.Format( "@{0} {1} = {2}", p.ParameterName, p.SqlDbType, p.SqlValue ?? "null" );
@@ -162,6 +178,14 @@ namespace Rock
                         else if ( p.SqlDbType == System.Data.SqlDbType.Udt )
                         {
                             return string.Format( "@{0} {1} = '{2}'", p.ParameterName, p.UdtTypeName, p.SqlValue );
+                        }
+                        else if ( p.SqlDbType == System.Data.SqlDbType.Bit )
+                        {
+                            return string.Format( "@{0} {1} = {2}", p.ParameterName, p.SqlDbType, ( ( System.Data.SqlTypes.SqlBoolean ) p.SqlValue ).ByteValue );
+                        }
+                        else if ( p.SqlDbType == System.Data.SqlDbType.Decimal )
+                        {
+                            return string.Format( "@{0} {1} = {2}", p.ParameterName, p.SqlDbType, p.SqlValue ?? "null" );
                         }
                         else
                         {
@@ -178,12 +202,17 @@ namespace Rock
 
                 sbDebug.AppendLine( "\nEND\nGO\n\n" );
 
+                System.Diagnostics.Debug.Write( sbDebug.ToString() );
+
+                var sqlConnection = command.Connection as System.Data.SqlClient.SqlConnection;
+
+                sqlConnection.StatisticsEnabled = true;
+                sqlConnection.ResetStatistics();
+
                 if ( userState == null )
                 {
                     userState = new DebugHelperUserState { CallNumber = DebugHelper._callCounts, Stopwatch = Stopwatch.StartNew() };
                 }
-
-                System.Diagnostics.Debug.Write( sbDebug.ToString() );
             }
 
             /// <summary>
@@ -198,7 +227,15 @@ namespace Rock
                 if ( debugHelperUserState != null )
                 {
                     debugHelperUserState.Stopwatch.Stop();
-                    System.Diagnostics.Debug.Write( string.Format( "\n/* Call# {0}: ElapsedTime [{1}ms]*/\n", debugHelperUserState.CallNumber, debugHelperUserState.Stopwatch.Elapsed.TotalMilliseconds ) );
+
+                    var sqlConnection = command.Connection as System.Data.SqlClient.SqlConnection;
+
+                    var stats = sqlConnection.RetrieveStatistics();
+                    sqlConnection.StatisticsEnabled = false;
+                    var commandExecutionTimeInMs = ( long ) stats["ExecutionTime"];
+
+                    System.Diagnostics.Debug.Write( $"\n/* Call# {debugHelperUserState.CallNumber}: ElapsedTime [{debugHelperUserState.Stopwatch.Elapsed.TotalMilliseconds}ms], SQLConnection.Statistics['ExecutionTime'] = [{commandExecutionTimeInMs}ms] */\n" );
+                    _callMSTotal += debugHelperUserState.Stopwatch.Elapsed.TotalMilliseconds;
                 }
             }
         }
@@ -209,14 +246,41 @@ namespace Rock
         private static DebugLoggingDbCommandInterceptor _debugLoggingDbCommandInterceptor = new DebugLoggingDbCommandInterceptor();
 
         /// <summary>
+        /// SQLs the logging start.
+        /// </summary>
+        public static void SQLLoggingStart()
+        {
+            SQLLoggingStart( null );
+        }
+
+        /// <summary>
         /// Starts logging all EF SQL Calls to the Debug Output Window as T-SQL Blocks
         /// </summary>
-        /// <param name="rockContext">The rock context to limit the output to.  Leave blank to show output for all rockContexts.</param>
-        public static void SQLLoggingStart( RockContext rockContext = null )
+        /// <param name="rockContext">The rock context.</param>
+        public static void SQLLoggingStart( RockContext rockContext )
+        {
+            SQLLoggingStart( ( DbContext ) rockContext );
+        }
+
+        /// <summary>
+        /// Starts logging all EF SQL Calls to the Debug Output Window as T-SQL Blocks
+        /// </summary>
+        /// <param name="dbContext">The database context.</param>
+        public static void SQLLoggingStart( System.Data.Entity.DbContext dbContext )
         {
             _callCounts = 0;
+            _callMSTotal = 0.00;
             SQLLoggingStop();
-            _debugLoggingDbCommandInterceptor.RockContext = rockContext;
+
+            if ( dbContext != null )
+            {
+                _debugLoggingDbCommandInterceptor.DbContextList.Add( dbContext );
+            }
+            else
+            {
+                _debugLoggingDbCommandInterceptor.EnableForAllDbContexts = true;
+            }
+
             DbInterception.Add( _debugLoggingDbCommandInterceptor );
         }
 
@@ -225,7 +289,42 @@ namespace Rock
         /// </summary>
         public static void SQLLoggingStop()
         {
+            if ( _callCounts != 0 )
+            {
+                Debug.WriteLine( $"####SQLLogging Summary: _callCounts:{_callCounts}, _callMSTotal:{_callMSTotal}, _callMSTotal/_callCounts:{_callMSTotal / _callCounts}####" );
+            }
+
             DbInterception.Remove( _debugLoggingDbCommandInterceptor );
+        }
+
+        /// <summary>
+        /// Enables or Disables SqlLogging
+        /// </summary>
+        /// <param name="dbContext">The database context to filter logs to.</param>
+        /// <param name="enable">if set to <c>true</c> [enable].</param>
+        public static void SqlLogging( this System.Data.Entity.DbContext dbContext, bool enable )
+        {
+            if ( enable )
+            {
+                DebugHelper.SQLLoggingStart( dbContext );
+            }
+            else
+            {
+                if ( dbContext == null )
+                {
+                    _debugLoggingDbCommandInterceptor.EnableForAllDbContexts = false;
+                }
+                else
+                {
+                    _debugLoggingDbCommandInterceptor.DbContextList.Remove( dbContext );
+                }
+
+                if ( !_debugLoggingDbCommandInterceptor.DbContextList.Any() && !_debugLoggingDbCommandInterceptor.EnableForAllDbContexts )
+                {
+                    DebugHelper.SQLLoggingStop();
+                }
+            }
+
         }
     }
 }

@@ -14,14 +14,10 @@
 // limitations under the License.
 // </copyright>
 //
-using System;
 using System.ComponentModel;
 using System.Globalization;
 using System.Web.UI;
-using System.Web.UI.HtmlControls;
 using System.Web.UI.WebControls;
-
-using Rock;
 
 namespace Rock.Web.UI.Controls
 {
@@ -45,7 +41,7 @@ namespace Rock.Web.UI.Controls
         ]
         public string DataLoadingText
         {
-            get { return ViewState["DataLoadingText"] as string ?? "<i class='fa fa-refresh fa-spin working'></i>"; }
+            get { return ViewState["DataLoadingText"] as string; }
             set { ViewState["DataLoadingText"] = value; }
         }
 
@@ -97,7 +93,7 @@ namespace Rock.Web.UI.Controls
             set { ViewState["CompletedMessage"] = value; }
         }
 
-        private bool _isButtonClicked;
+        private bool _isButtonClicked = false;
 
         /// <summary>
         /// Adds the attributes of the <see cref="T:System.Web.UI.WebControls.LinkButton" /> control to the output stream for rendering on the client.
@@ -188,7 +184,7 @@ namespace Rock.Web.UI.Controls
         {
             base.OnCommand( e );
 
-            if ( CompletedText.IsNotNullOrWhitespace() || CompletedMessage.IsNotNullOrWhitespace() )
+            if ( CompletedText.IsNotNullOrWhiteSpace() || CompletedMessage.IsNotNullOrWhiteSpace() )
             {
                 _isButtonClicked = true;
                 var script = string.Format(

@@ -93,7 +93,7 @@ namespace RockWeb.Blocks.Connection
             if ( opportunityId != null )
             {
                 _connectionOpportunity = new ConnectionOpportunityService( new RockContext() ).Get( opportunityId.Value );
-                if ( _connectionOpportunity != null && _connectionOpportunity.IsAuthorized( Authorization.VIEW, CurrentPerson ) )
+                if ( _connectionOpportunity != null )
                 {
                     breadCrumbs.Add( new BreadCrumb( _connectionOpportunity.Name, pageReference ) );
                 }
@@ -136,7 +136,7 @@ namespace RockWeb.Blocks.Connection
                 mergeFields.Add( "LinkedPages", linkedPages );
 
                 // Add Campus Context
-                mergeFields.Add( "CampusContext", RockPage.GetCurrentContext( EntityTypeCache.Read( "Rock.Model.Campus" ) ) as Campus );
+                mergeFields.Add( "CampusContext", RockPage.GetCurrentContext( EntityTypeCache.Get( "Rock.Model.Campus" ) ) as Campus );
 
                 // Resolve any lava in the summary/description fields before adding the opportunity
                 _connectionOpportunity.Summary = _connectionOpportunity.Summary.ResolveMergeFields( mergeFields );

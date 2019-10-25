@@ -17,12 +17,37 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Web.UI;
 using System.Web.UI.WebControls;
 
+using Rock.Model;
+using Rock.Web.Cache;
+
 namespace Rock.Web.UI.Controls
 {
+    /// <summary>
+    /// Options for the layout of controls in the Grid Filter  Enum that defines when a column should be included in an Excel export ( when in ColumnOutput ExportSource )
+    /// </summary>
+    public enum GridFilterLayoutSpecifier
+    {
+        /// <summary>
+        /// The default
+        /// </summary>
+        Default = 0,
+        /// <summary>
+        /// Layout the filter field controls as defined in the control markup.
+        /// </summary>
+        Custom = 1,
+        /// <summary>
+        /// Layout the filter field controls using a 2-column bootstrap layout.
+        /// </summary>
+        TwoColumnLayout = 2,
+        /// <summary>
+        /// Layout the filter field controls using a 3-column bootstrap layout.
+        /// </summary>
+        ThreeColumnLayout = 3
+    }
+
     /// <summary>
     /// 
     /// </summary>
@@ -57,13 +82,13 @@ namespace Rock.Web.UI.Controls
             RockBlock rockBlock = this.RockBlock();
             if ( rockBlock != null )
             {
-                string keyPrefix = string.Format( "grid-filter-{0}-", rockBlock.BlockId );
+                string blockKeyPrefix = string.Format( "grid-filter-{0}-", rockBlock.BlockId );
 
-                foreach ( var userPreference in rockBlock.GetUserPreferences( keyPrefix ) )
+                foreach ( var userPreference in rockBlock.GetUserPreferences( blockKeyPrefix ) )
                 {
-                    var blockKey = userPreference.Key.Replace( keyPrefix, string.Empty );
-                    var keyName = blockKey.Split( new char[] {'|'}, StringSplitOptions.RemoveEmptyEntries );
-                    if ( blockKey.Contains("|") && keyName.Length == 2 )
+                    var blockKey = userPreference.Key.Replace( blockKeyPrefix, string.Empty );
+                    var keyName = blockKey.Split( new char[] { '|' }, StringSplitOptions.RemoveEmptyEntries );
+                    if ( blockKey.Contains( "|" ) && keyName.Length == 2 )
                     {
                         // only load userPreferences that are stored in the {key}|{name} format
                         // and make sure there isn't more than one with the same key
@@ -95,6 +120,46 @@ namespace Rock.Web.UI.Controls
         }
 
         /// <summary>
+        /// Gets or sets the user preference key prefix.
+        /// Set this to add an additional prefix ( other than just block.Id ) on each UserPreference key for this filter. 
+        /// For example, if this is a filter for a GroupMemberList, you might want the UserPreferenceKeyPrefix be `{{ GroupId }}-`
+        /// so that user preferences for this grid filter are per group instead of just per block. 
+        /// </summary>
+        /// <value>
+        /// The user preference key prefix.
+        /// </value>
+        public string UserPreferenceKeyPrefix
+        {
+            get
+            {
+                return ViewState["UserPreferenceKeyPrefix"] as string ?? string.Empty;
+            }
+
+            set
+            {
+                ViewState["UserPreferenceKeyPrefix"] = value;
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets the layout format for the filter fields displayed by the control.
+        /// </summary>
+        public GridFilterLayoutSpecifier FieldLayout
+        {
+            get
+            {
+                var stateValue = ViewState["FieldLayout"];
+
+                return ( stateValue == null ) ? GridFilterLayoutSpecifier.Default : ( GridFilterLayoutSpecifier ) stateValue;
+            }
+
+            set
+            {
+                ViewState["FieldLayout"] = value;
+            }
+        }
+
+        /// <summary>
         /// Shows the filter in expanded mode
         /// </summary>
         public void Show()
@@ -119,6 +184,7 @@ namespace Rock.Web.UI.Controls
             $hf.val('false');
         }
         $(this).siblings('div').slideToggle();
+        return false;
     });
 ";
             ScriptManager.RegisterStartupScript( this, this.GetType(), scriptKey, script, true );
@@ -197,14 +263,16 @@ namespace Rock.Web.UI.Controls
 
                 writer.Write( "<header>" );
 
-                writer.RenderBeginTag( HtmlTextWriterTag.H3 );
+                writer.AddAttribute( HtmlTextWriterAttribute.Class, visible ? "btn btn-link btn-xs is-open" : "btn btn-link btn-xs" );
+                writer.RenderBeginTag( HtmlTextWriterTag.Button );
                 writer.Write( "Filter Options" );
-                writer.RenderEndTag();
 
                 _hfVisible.RenderControl( writer );
 
-                writer.AddAttribute( "class", visible ? "fa fa-chevron-up toggle-filter" : "fa fa-chevron-down toggle-filter" );
+                writer.AddAttribute( "class", visible ? "btn-icon fa fa-chevron-up toggle-filter" : "btn-icon fa fa-chevron-down toggle-filter" );
                 writer.RenderBeginTag( HtmlTextWriterTag.I );
+                writer.RenderEndTag();
+
                 writer.RenderEndTag();
 
                 writer.Write( "</header>" );
@@ -221,12 +289,22 @@ namespace Rock.Web.UI.Controls
                 var filterDisplay = new Dictionary<string, string>();
                 AdditionalFilterDisplay.ToList().ForEach( d => filterDisplay.Add( d.Key, d.Value ) );
 
-                var nonEmptyValues = _userPreferences.Where( v => !string.IsNullOrEmpty( v.Value ) ).ToList();
+                List<UserPreference> userPreferencesForFilter;
+                if ( this.UserPreferenceKeyPrefix.IsNotNullOrWhiteSpace() )
+                {
+                    userPreferencesForFilter = _userPreferences.Where( a => a.Key.StartsWith( this.UserPreferenceKeyPrefix ) ).ToList();
+                }
+                else
+                {
+                    userPreferencesForFilter = _userPreferences;
+                }
+
+                var nonEmptyValues = userPreferencesForFilter.Where( v => !string.IsNullOrEmpty( v.Value ) ).ToList();
                 if ( nonEmptyValues.Count > 0 )
                 {
                     foreach ( var userPreference in nonEmptyValues )
                     {
-                        DisplayFilterValueArgs args = new DisplayFilterValueArgs( userPreference );
+                        DisplayFilterValueArgs args = new DisplayFilterValueArgs( userPreference, this.UserPreferenceKeyPrefix );
                         if ( DisplayFilterValue != null )
                         {
                             DisplayFilterValue( this, args );
@@ -244,9 +322,13 @@ namespace Rock.Web.UI.Controls
                     writer.RenderBeginTag( HtmlTextWriterTag.Fieldset );
                     writer.WriteLine( "<h4>Enabled Filters</h4>" );
                     writer.WriteLine( "<div class='row'>" );
-                    foreach( var filterNameValue in filterDisplay.OrderBy( f => f.Key ) )
+
+                    // Calculate the filter column size by dividing the Bootstrap 12-column layout into equal widths.
+                    int columnSize = ( this.FieldLayout == GridFilterLayoutSpecifier.TwoColumnLayout ) ? 6 : 4;
+
+                    foreach ( var filterNameValue in filterDisplay.OrderBy( f => f.Key ) )
                     {
-                        writer.WriteLine( "<div class='col-md-3'>" );
+                        writer.WriteLine( "<div class='col-md-{0}'>", columnSize );
                         writer.WriteLine( string.Format( "<label>{0}:</label> {1}", filterNameValue.Key, filterNameValue.Value ) );
                         writer.WriteLine( "</div>" );
                     }
@@ -300,14 +382,36 @@ namespace Rock.Web.UI.Controls
         /// <param name="writer">The <see cref="T:System.Web.UI.HtmlTextWriter" /> object that receives the rendered content.</param>
         protected override void RenderChildren( HtmlTextWriter writer )
         {
-            if ( this.Controls != null )
+            if ( this.Controls == null )
+            {
+                return;
+            }
+
+            if ( this.FieldLayout == GridFilterLayoutSpecifier.Custom )
+            {
+                // If custom layout specified, do not reformat the child controls.
+                foreach ( Control child in this.Controls )
+                {
+                    if ( child == _lbFilter || child == _lbClearFilter || child == _hfVisible )
+                    {
+                        continue;
+                    }
+
+                    child.RenderControl( writer );
+                }
+            }
+            else
             {
                 // wrap filter items in bootstrap responsive grid
                 int cellCount = 0;
-                const int cellsPerRow = 3;
+
+                // Calculate the Bootstrap column size by dividing the 12-column layout into equal partitions.
+                int cellsPerRow = ( this.FieldLayout == GridFilterLayoutSpecifier.TwoColumnLayout ) ? 2 : 3;
+
+                int bootstrapColumnSize = 12 / cellsPerRow;
 
                 // write first row
-                writer.AddAttribute("class", "row");
+                writer.AddAttribute( "class", "row" );
                 writer.RenderBeginTag( HtmlTextWriterTag.Div );
 
                 var filterControls = new List<Control>();
@@ -339,7 +443,7 @@ namespace Rock.Web.UI.Controls
                         // add column
                         if ( child.Visible )
                         {
-                            writer.AddAttribute( "class", "col-lg-4" );
+                            writer.AddAttribute( "class", string.Format( "col-lg-{0}", bootstrapColumnSize ) );
                             writer.RenderBeginTag( HtmlTextWriterTag.Div );
                         }
 
@@ -359,25 +463,39 @@ namespace Rock.Web.UI.Controls
         }
 
         /// <summary>
-        /// Gets the user preference for a given key if it exists
+        /// Gets the Key after the <see cref="UserPreferenceKeyPrefix"></see> has been applied
+        /// </summary>
+        /// <param name="key">The key.</param>
+        /// <returns></returns>
+        private string GetPrefixedKey( string key )
+        {
+            return $"{UserPreferenceKeyPrefix}{key}";
+        }
+
+        /// <summary>
+        /// Gets the user preference for a given key if it exists.
+        /// Note: Key is internally stored with the Block.Id plus any <see cref="UserPreferenceKeyPrefix"/> to make it unique per block and <see cref="UserPreferenceKeyPrefix"/>
         /// </summary>
         /// <param name="key">The key.</param>
         /// <returns></returns>
         public string GetUserPreference( string key )
         {
-            return _userPreferences.Where( p => p.Key == key ).Select( p => p.Value ).FirstOrDefault() ?? string.Empty;
+            var prefixedKey = this.GetPrefixedKey( key );
+            return _userPreferences.Where( p => p.Key == prefixedKey ).Select( p => p.Value ).FirstOrDefault() ?? string.Empty;
         }
 
         /// <summary>
-        /// Adds or updates an item in the User Preferences dictionary
+        /// Adds or updates an item in the User Preferences dictionary.
+        /// Note: Key is internally stored with the Block.Id plus any <see cref="UserPreferenceKeyPrefix"/> to make it unique per block and <see cref="UserPreferenceKeyPrefix"/>
         /// </summary>
         /// <param name="key">The key.</param>
         /// <param name="name">The name.</param>
         /// <param name="value">The value.</param>
         public void SaveUserPreference( string key, string name, string value )
         {
-            var userPreference = _userPreferences.FirstOrDefault( p => p.Key == key );
-            if ( userPreference != null  )
+            var prefixedKey = this.GetPrefixedKey( key );
+            var userPreference = _userPreferences.FirstOrDefault( p => p.Key == prefixedKey );
+            if ( userPreference != null )
             {
                 if ( userPreference.Name != name || userPreference.Value != value )
                 {
@@ -389,12 +507,13 @@ namespace Rock.Web.UI.Controls
             else
             {
                 _isDirty = true;
-                _userPreferences.Add( new UserPreference( key, name, value ) );
+                _userPreferences.Add( new UserPreference( prefixedKey, name, value ) );
             }
         }
 
         /// <summary>
-        /// Adds or updates an item in the User Preferences dictionary
+        /// Adds or updates an item in the User Preferences dictionary.
+        /// Note: Key is internally stored with the Block.Id plus any <see cref="UserPreferenceKeyPrefix"/> to make it unique per block and <see cref="UserPreferenceKeyPrefix"/>
         /// </summary>
         /// <param name="key">The key.</param>
         /// <param name="value">The value.</param>
@@ -415,20 +534,46 @@ namespace Rock.Web.UI.Controls
 
                 foreach ( var userPreference in _userPreferences )
                 {
-                    rockBlock.SetUserPreference( string.Format( "{0}{1}|{2}", keyPrefix, userPreference.Key, userPreference.Name ), userPreference.Value );
+                    string keyPrefixUserPreferenceKey = string.Format( "{0}{1}|", keyPrefix, userPreference.Key );
+                    string key = string.Format( "{0}{1}", keyPrefixUserPreferenceKey, userPreference.Name);
+
+                    // No duplicate user preference key values before the '|' are allowed.
+                    // This search for any keys that match before the '|' but mismatch after '|' and delete it before writing the user preference.
+                    int? personEntityTypeId = EntityTypeCache.Get( Person.USER_VALUE_ENTITY ).Id;
+
+                    using ( var rockContext = new Rock.Data.RockContext() )
+                    {
+                        var attributeService = new Model.AttributeService( rockContext );
+                        var attributes = attributeService
+                            .Queryable()
+                            .Where( a => a.EntityTypeId == personEntityTypeId )
+                            .Where( a => a.Key.StartsWith( keyPrefixUserPreferenceKey ) )
+                            .Where( a => a.Key != key );
+
+                        if ( attributes.Count() != 0 )
+                        {
+                            foreach ( var attribute in attributes )
+                            {
+                                rockBlock.DeleteUserPreference( attribute.Key );
+                            }
+                        }
+                        rockContext.SaveChanges();
+                    }
+
+                    rockBlock.SetUserPreference( key, userPreference.Value );
                 }
             }
         }
 
         /// <summary>
-        /// Deletes all the grid user preferences for all grid filters on the block
+        /// Deletes all the grid user preferences for all grid filters on the block. If <see cref="UserPreferenceKeyPrefix"/> is set, it will only delete user preferences for the grid filter(s) on the block that has the UserPreferenceKeyPrefix.
         /// </summary>
         public void DeleteUserPreferences()
         {
             RockBlock rockBlock = this.RockBlock();
             if ( rockBlock != null && _userPreferences != null )
             {
-                string keyPrefix = string.Format( "grid-filter-{0}-", rockBlock.BlockId );
+                string keyPrefix = string.Format( "grid-filter-{0}-", rockBlock.BlockId ) + this.UserPreferenceKeyPrefix;
 
                 foreach ( var userPreference in _userPreferences )
                 {
@@ -463,6 +608,7 @@ namespace Rock.Web.UI.Controls
         {
             /// <summary>
             /// Gets or sets the key.
+            /// Note: This is the Key without the internally stored Block.Id plus any <see cref="UserPreferenceKeyPrefix"/> prefix
             /// </summary>
             /// <value>
             /// The key.
@@ -491,6 +637,8 @@ namespace Rock.Web.UI.Controls
             /// <param name="key">The key.</param>
             /// <param name="name">The name.</param>
             /// <param name="value">The value.</param>
+            [RockObsolete( "1.7.4" )]
+            [Obsolete( "DisplayFilterValueArgs(userPreference, prefix) instead", true )]
             public DisplayFilterValueArgs( string key, string name, string value )
             {
                 Key = key;
@@ -502,9 +650,30 @@ namespace Rock.Web.UI.Controls
             /// Initializes a new instance of the <see cref="DisplayFilterValueArgs"/> class.
             /// </summary>
             /// <param name="userPreference">The user preference.</param>
-            public DisplayFilterValueArgs( UserPreference userPreference )
+            [RockObsolete( "1.7.4" )]
+            [Obsolete( "DisplayFilterValueArgs(userPreference, prefix) instead", true )]
+            public DisplayFilterValueArgs( UserPreference userPreference ) :
+                this( userPreference, null )
             {
-                Key = userPreference.Key;
+                //
+            }
+
+            /// <summary>
+            /// Initializes a new instance of the <see cref="DisplayFilterValueArgs"/> class.
+            /// </summary>
+            /// <param name="userPreference">The user preference.</param>
+            /// <param name="prefix">The prefix.</param>
+            public DisplayFilterValueArgs( UserPreference userPreference, string prefix )
+            {
+                if ( !string.IsNullOrEmpty( prefix ) && userPreference.Key.StartsWith( prefix ) )
+                {
+                    Key = userPreference.Key.Substring( prefix.Length );
+                }
+                else
+                {
+                    Key = userPreference.Key;
+                }
+
                 Name = userPreference.Name;
                 Value = userPreference.Value;
             }

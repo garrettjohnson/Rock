@@ -51,6 +51,12 @@ namespace Rock.Model
         public bool CanDelete( Communication item, out string errorMessage )
         {
             errorMessage = string.Empty;
+ 
+            if ( new Service<CommunicationResponse>( Context ).Queryable().Any( a => a.RelatedCommunicationId == item.Id ) )
+            {
+                errorMessage = string.Format( "This {0} is assigned to a {1}.", Communication.FriendlyTypeName, CommunicationResponse.FriendlyTypeName );
+                return false;
+            }  
             return true;
         }
     }
@@ -94,6 +100,7 @@ namespace Rock.Model
             target.CommunicationTemplateId = source.CommunicationTemplateId;
             target.CommunicationType = source.CommunicationType;
             target.EnabledLavaCommands = source.EnabledLavaCommands;
+            target.ExcludeDuplicateRecipientAddress = source.ExcludeDuplicateRecipientAddress;
             target.ForeignGuid = source.ForeignGuid;
             target.ForeignKey = source.ForeignKey;
             target.FromEmail = source.FromEmail;
@@ -113,6 +120,7 @@ namespace Rock.Model
             target.ReviewerPersonAliasId = source.ReviewerPersonAliasId;
             target.SegmentCriteria = source.SegmentCriteria;
             target.Segments = source.Segments;
+            target.SendDateTime = source.SendDateTime;
             target.SenderPersonAliasId = source.SenderPersonAliasId;
             target.SMSFromDefinedValueId = source.SMSFromDefinedValueId;
             target.SMSMessage = source.SMSMessage;

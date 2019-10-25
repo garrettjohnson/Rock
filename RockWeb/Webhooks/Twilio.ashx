@@ -28,6 +28,9 @@ using Rock.Data;
 using Rock.Model;
 using Rock.Web.Cache;
 
+/// <summary>
+/// This the Twilio Webwook that updates the communication recipient record to indicate the message status, and runs any Workflow configured with the SMS Phone Number that the message was from.
+/// </summary>
 public class TwilioAsync : IHttpAsyncHandler
 {
     public IAsyncResult BeginProcessRequest(HttpContext context, AsyncCallback cb, Object extraData)
@@ -79,7 +82,20 @@ class TwilioResponseAsync : IAsyncResult
 
     public void StartAsyncWork()
     {
-        ThreadPool.QueueUserWorkItem(new WaitCallback(StartAsyncTask), null);
+        ThreadPool.QueueUserWorkItem( ( workItemState ) =>
+        {
+            try
+            {
+                StartAsyncTask( workItemState );
+            }
+            catch ( Exception ex )
+            {
+                Rock.Model.ExceptionLogService.LogException( ex );
+                _context.Response.StatusCode = 500;
+                _completed = true;
+                _callback( this );
+            }
+        }, null );
     }
 
     private void StartAsyncTask(Object workItemState)
@@ -107,7 +123,7 @@ class TwilioResponseAsync : IAsyncResult
                 switch (request.Form["SmsStatus"])
                 {
                     case "received":
-                        MessageRecieved();
+                        MessageReceived();
                         break;
                     case "undelivered":
                         MessageUndelivered();
@@ -137,24 +153,26 @@ class TwilioResponseAsync : IAsyncResult
             messageSid = request.Form["MessageSid"];
 
             // get communication from the message side
-            RockContext rockContext = new RockContext();
-            CommunicationRecipientService recipientService = new CommunicationRecipientService(rockContext);
+            using ( RockContext rockContext = new RockContext() )
+            {
+                CommunicationRecipientService recipientService = new CommunicationRecipientService( rockContext );
 
-            var communicationRecipient = recipientService.Queryable().Where( r => r.UniqueMessageId == messageSid ).FirstOrDefault();
-            if ( communicationRecipient != null )
-            {
-                communicationRecipient.Status = CommunicationRecipientStatus.Failed;
-                communicationRecipient.StatusNote = "Message failure notified from Twilio on " + RockDateTime.Now.ToString();
-                rockContext.SaveChanges();
-            }
-            else
-            {
-                WriteToLog( "No recipient was found with the specified MessageSid value!" );
+                var communicationRecipient = recipientService.Queryable().Where( r => r.UniqueMessageId == messageSid ).FirstOrDefault();
+                if ( communicationRecipient != null )
+                {
+                    communicationRecipient.Status = CommunicationRecipientStatus.Failed;
+                    communicationRecipient.StatusNote = "Message failure notified from Twilio on " + RockDateTime.Now.ToString();
+                    rockContext.SaveChanges();
+                }
+                else
+                {
+                    WriteToLog( "No recipient was found with the specified MessageSid value!" );
+                }
             }
         }
     }
 
-    private void MessageRecieved()
+    private void MessageReceived()
     {
 
         var request = _context.Request;
@@ -224,7 +242,7 @@ class TwilioResponseAsync : IAsyncResult
             {
                 if ( retry < maxRetry - 1 )
                 {
-                    System.Threading.Thread.Sleep( 2000 );
+                    System.Threading.Tasks.Task.Delay( 2000 ).Wait();
                 }
             }
         }

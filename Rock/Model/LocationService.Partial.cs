@@ -18,7 +18,9 @@ using System;
 using System.Collections.Generic;
 using System.Data.Entity.Spatial;
 using System.Linq;
+
 using Rock.Data;
+using Rock.Web.Cache;
 
 namespace Rock.Model
 {
@@ -28,8 +30,8 @@ namespace Rock.Model
     public partial class LocationService
     {
         /// <summary>
-        /// Returns the first
-        /// <see cref="Rock.Model.Location" /> where the address matches the provided address, otherwise the address will be saved as a new location.
+        /// Returns the first <see cref="Rock.Model.Location" /> where the address matches the provided address, otherwise the address will be saved as a new location.
+        /// Note: if <paramref name="street1"/> is blank, null will be returned.
         /// </summary>
         /// <param name="street1">A <see cref="string" /> representing the Address Line 1 to search by.</param>
         /// <param name="street2">A <see cref="string" /> representing the Address Line 2 to search by.</param>
@@ -47,8 +49,9 @@ namespace Rock.Model
         }
 
         /// <summary>
-        /// Returns the first
-        /// <see cref="Rock.Model.Location" /> where the address matches the provided address, otherwise the address will be saved as a new location.
+        /// Returns the first <see cref="Rock.Model.Location" /> where the address matches the provided address, otherwise the address will be saved as a new location.
+        /// Note: if <paramref name="street1"/> is blank, null will be returned.
+        /// Note: The location search IS NOT constrained by the provided group. Providing the group will cause this method to search that groups locations first, giving a faster result.
         /// </summary>
         /// <param name="street1">A <see cref="string" /> representing the Address Line 1 to search by.</param>
         /// <param name="street2">A <see cref="string" /> representing the Address Line 2 to search by.</param>
@@ -56,23 +59,40 @@ namespace Rock.Model
         /// <param name="state">A <see cref="string" /> representing the State to search by.</param>
         /// <param name="postalCode">A <see cref="string" /> representing the Zip/Postal code to search by</param>
         /// <param name="country">A <see cref="string" /> representing the Country to search by</param>
-        /// <param name="group">The <see cref="Group"/> (usually a Family) that should be searched first</param>
+        /// <param name="group">The <see cref="Group"/> (usually a Family) that should be searched first. This is NOT a search constraint.</param>
         /// <param name="verifyLocation">if set to <c>true</c> [verify location].</param>
+        /// <param name="createNewLocation">if set to <c>true</c> a new location will be created if it does not exists.</param>
         /// <returns>
         /// The first <see cref="Rock.Model.Location" /> where an address match is found, if no match is found a new <see cref="Rock.Model.Location" /> is created and returned.
         /// </returns>
-        public Location Get( string street1, string street2, string city, string state, string postalCode, string country, Group group, bool verifyLocation = true )
+        public Location Get( string street1, string street2, string city, string state, string postalCode, string country, Group group, bool verifyLocation = true, bool createNewLocation = true )
         {
-            // Make sure it's not an empty address
-            if ( string.IsNullOrWhiteSpace( street1 ) )
-            {
-                return null;
-            }
+            //// Make sure it's not an empty address
+            //// This will not be checked anymore to enable a location to save with whatever info is available. Sometimes the only info given or legible on the card is the city and state.
+            //// If there are any downstream effects of this change do not fix them by uncommenting this code without speaking to the architect first.
+            //if ( string.IsNullOrWhiteSpace( street1 ) )
+            //{
+            //    return null;
+            //}
 
-            // Try to find a location that matches the values exactly as entered
+            // Try to find a location that matches the values, this is not a case sensitive match
             var foundLocation = Search( new Location { Street1 = street1, Street2 = street2, City = city, State = state, PostalCode = postalCode, Country = country }, group );
-            if (foundLocation != null)
+            if ( foundLocation != null )
             {
+                // Check for casing 
+                if ( !String.Equals( street1, foundLocation.Street1 ) || !String.Equals( street2, foundLocation.Street2 ) || !String.Equals( city, foundLocation.City ) || !String.Equals( state, foundLocation.State ) || !String.Equals( postalCode, foundLocation.PostalCode ) || !String.Equals( country, foundLocation.Country ) )
+                {
+                    var context = new RockContext();
+                    var location = new LocationService( context ).Get( foundLocation.Id );
+                    location.Street1 = street1;
+                    location.Street2 = street2;
+                    location.City = city;
+                    location.State = state;
+                    location.PostalCode = postalCode;
+                    location.Country = country;
+                    context.SaveChanges();
+                    return Get( location.Guid );
+                }
                 return foundLocation;
             }
 
@@ -98,11 +118,14 @@ namespace Rock.Model
                 return foundLocation;
             }
 
-            // Create a new context/service so that save does not affect calling method's context
-            var rockContext = new RockContext();
-            var locationService = new LocationService( rockContext );
-            locationService.Add( newLocation );
-            rockContext.SaveChanges();
+            if ( createNewLocation )
+            {
+                // Create a new context/service so that save does not affect calling method's context
+                var rockContext = new RockContext();
+                var locationService = new LocationService( rockContext );
+                locationService.Add( newLocation );
+                rockContext.SaveChanges();
+            }
 
             // refetch it from the database to make sure we get a valid .Id
             return Get( newLocation.Guid );
@@ -370,7 +393,7 @@ namespace Rock.Model
                         logService.Add( log );
                     }
 
-                    // If location has been succesfully standardized and geocoded, break to get out, otherwise next service will be attempted
+                    // If location has been successfully standardized and geocoded, break to get out, otherwise next service will be attempted
                     if ( standardized && geocoded )
                     {
                         break;
@@ -395,6 +418,34 @@ namespace Rock.Model
             rockContext.SaveChanges();
 
             return standardized || geocoded;
+        }
+
+        /// <summary>
+        /// Gets the mapCoordinate from postalcode.
+        /// </summary>
+        /// <param name="postalCode">The postalcode.</param>
+        /// <returns></returns>
+        public MapCoordinate GetMapCoordinateFromPostalCode( string postalCode )
+        {
+            Address.SmartyStreets smartyStreets = new Address.SmartyStreets();
+            string resultMsg = string.Empty;
+            var coordinate =  smartyStreets.GetLocationFromPostalCode( postalCode, out resultMsg );
+            // Log the results of the service
+            if ( !string.IsNullOrWhiteSpace( resultMsg ) )
+            {
+                var rockContext = new RockContext();
+                Model.ServiceLogService logService = new Model.ServiceLogService( rockContext );
+                Model.ServiceLog log = new Model.ServiceLog();
+                log.LogDateTime = RockDateTime.Now;
+                log.Type = "Mapcoordinate from postalcode";
+                log.Name = smartyStreets.TypeName;
+                log.Input = postalCode;
+                log.Result = resultMsg.Left( 200 );
+                log.Success = coordinate != null;
+                logService.Add( log );
+                rockContext.SaveChanges();
+            }
+            return coordinate;
         }
 
         /// <summary>
@@ -491,36 +542,39 @@ namespace Rock.Model
                 return null;
             }
 
-            // If location is not a campus, check the location's parent locations to see if any of them are a campus
             var location = this.Get( locationId.Value );
             int? campusId = location.CampusId;
-            if ( !campusId.HasValue )
+            if ( campusId.HasValue )
             {
-                var campusLocations = new Dictionary<int, int>();
-                Rock.Web.Cache.CampusCache.All()
-                    .Where( c => c.LocationId.HasValue )
-                    .Select( c => new
-                    {
-                        CampusId = c.Id,
-                        LocationId = c.LocationId.Value
-                    } )
-                    .ToList()
-                    .ForEach( c => campusLocations.Add( c.CampusId, c.LocationId ) );
+                return campusId;
+            }
 
-                foreach ( var parentLocationId in this.GetAllAncestorIds( locationId.Value ) )
+            // If location is not a campus, check the location's parent locations to see if any of them are a campus
+            var campusLocations = new Dictionary<int, int>();
+            CampusCache.All()
+                .Where( c => c.LocationId.HasValue )
+                .Select( c => new
                 {
-                    campusId = campusLocations
-                        .Where( c => c.Value == parentLocationId )
-                        .Select( c => c.Key )
-                        .FirstOrDefault();
-                    if ( campusId != 0 )
-                    {
-                        break;
-                    }
+                    CampusId = c.Id,
+                    LocationId = c.LocationId.Value
+                } )
+                .ToList()
+                .ForEach( c => campusLocations.Add( c.CampusId, c.LocationId ) );
+
+            foreach ( var parentLocationId in this.GetAllAncestorIds( locationId.Value ) )
+            {
+                campusId = campusLocations
+                    .Where( c => c.Value == parentLocationId )
+                    .Select( c => c.Key )
+                    .FirstOrDefault();
+
+                if ( campusId != 0 )
+                {
+                    return campusId;
                 }
             }
 
-            return campusId;
+            return null;
         }
 
         /// <summary>
@@ -542,7 +596,7 @@ namespace Rock.Model
         }
 
         /// <summary>
-        /// Gets the locations associated to a device and optionally any child locaitons
+        /// Gets the locations associated to a device and optionally any child locations
         /// </summary>
         /// <param name="deviceId">The device identifier.</param>
         /// <param name="includeChildLocations">if set to <c>true</c> [include child locations].</param>
@@ -572,6 +626,18 @@ namespace Rock.Model
     SELECT L.* FROM CTE
     INNER JOIN [Location] L ON L.[Id] = CTE.[Id]
             ", deviceId, childQuery ) );
+        }
+
+        /// <summary>
+        /// Gets the locations for the Group and Schedule
+        /// </summary>
+        /// <param name="scheduleId">The schedule identifier.</param>
+        /// <param name="groupId">The group identifier.</param>
+        /// <returns></returns>
+        public IQueryable<Location> GetByGroupSchedule( int scheduleId, int groupId )
+        {
+            var groupLocationQuery = new GroupLocationService( this.Context as RockContext ).Queryable().Where( gl => gl.Schedules.Any( s => s.Id == scheduleId ) && gl.GroupId == groupId );
+            return this.Queryable().Where( l => groupLocationQuery.Any( gl => gl.LocationId == l.Id ) );
         }
     }
 }

@@ -139,13 +139,19 @@ namespace Rock.Reporting.DataSelect.Person
         /// <returns></returns>
         public override Expression GetExpression( RockContext context, MemberExpression entityIdProperty, string selection )
         {
-            Guid? phoneNumberTypeValueGuid = selection.AsGuidOrNull();
+            string[] selectionValues = selection.Split( '|' );
+            Guid? phoneNumberTypeValueGuid = null;
+            if ( selectionValues.Length >= 1)
+            {
+                phoneNumberTypeValueGuid = selectionValues[0].AsGuidOrNull();
+            }
+
             if ( !phoneNumberTypeValueGuid.HasValue )
             {
                 phoneNumberTypeValueGuid = Rock.SystemGuid.DefinedValue.PERSON_PHONE_TYPE_HOME.AsGuid();
             }
 
-            int phoneNumberTypeValueId = DefinedValueCache.Read( phoneNumberTypeValueGuid.Value ).Id;
+            int phoneNumberTypeValueId = DefinedValueCache.Get( phoneNumberTypeValueGuid.Value ).Id;
 
             // NOTE: This actually selects the entire PhoneNumber record instead of just one field. This is done intentionally so that the Grid will call the .ToString() method of PhoneNumber which formats it correctly
             var personPhoneNumberQuery = new PersonService( context ).Queryable()
@@ -165,7 +171,7 @@ namespace Rock.Reporting.DataSelect.Person
         {
             RockDropDownList phoneNumberTypeList = new RockDropDownList();
             phoneNumberTypeList.Items.Clear();
-            foreach (var value in DefinedTypeCache.Read(Rock.SystemGuid.DefinedType.PERSON_PHONE_TYPE.AsGuid()).DefinedValues.OrderBy( a => a.Order).ThenBy(a => a.Value))
+            foreach (var value in DefinedTypeCache.Get(Rock.SystemGuid.DefinedType.PERSON_PHONE_TYPE.AsGuid()).DefinedValues.OrderBy( a => a.Order).ThenBy(a => a.Value))
             {
                 phoneNumberTypeList.Items.Add( new ListItem( value.Value.EndsWith( "Phone" ) ? value.Value : value.Value + " Phone", value.Guid.ToString() ) );
             }
@@ -276,17 +282,17 @@ namespace Rock.Reporting.DataSelect.Person
                     {
                         if ( _currentPerson == null )
                         {
-                            e.FormattedValue = phoneNumber.NumberFormatted;
+                            e.FormattedValue = ( phoneNumber.NumberFormatted != null ) ? phoneNumber.NumberFormatted : phoneNumber.Number;
                             return;
                         }
 
                         var jsScript = string.Format( "javascript: Rock.controls.pbx.originate('{0}', '{1}', '{2}','{3}','{4}');", _currentPerson.Guid, phoneNumber.Number, _currentPerson.FullName, "", phoneNumber.ToString() );
 
-                        e.FormattedValue = string.Format( "<a class='originate-call js-originate-call' href=\"{0}\">{1}</a>", jsScript, phoneNumber.NumberFormatted );
+                        e.FormattedValue = string.Format( "<a class='originate-call js-originate-call' href=\"{0}\">{1}</a>", jsScript, ( phoneNumber.NumberFormatted != null ) ? phoneNumber.NumberFormatted : phoneNumber.Number );
                     }
                     else
                     {
-                        e.FormattedValue = phoneNumber.NumberFormatted;
+                        e.FormattedValue = ( phoneNumber.NumberFormatted != null ) ? phoneNumber.NumberFormatted : phoneNumber.Number;
                     }
                 }
                 else

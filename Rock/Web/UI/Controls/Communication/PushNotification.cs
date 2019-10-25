@@ -15,9 +15,9 @@
 // </copyright>
 //
 using System;
-using System.Collections.Generic;
 using System.Web.UI;
 using System.Web.UI.WebControls;
+
 using Rock.Communication;
 using Rock.Model;
 
@@ -49,7 +49,7 @@ namespace Rock.Web.UI.Controls.Communication
             EnsureChildControls();
             tbTitle.Text = communication.PushTitle;
             tbMessage.Text = communication.PushMessage;
-            cbSound.Checked = communication.PushSound.IsNotNullOrWhitespace();
+            cbSound.Checked = communication.PushSound.IsNotNullOrWhiteSpace();
         }
 
         /// <summary>

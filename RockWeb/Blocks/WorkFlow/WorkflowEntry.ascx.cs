@@ -41,10 +41,52 @@ namespace RockWeb.Blocks.WorkFlow
     [Category( "WorkFlow" )]
     [Description( "Used to enter information for a workflow form entry action." )]
 
-    [WorkflowTypeField( "Workflow Type", "Type of workflow to start." )]
-    [BooleanField( "Show Summary View", "If workflow has been completed, should the summary view be displayed?", false, "", 1)]
+    #region Block Attributes
+
+    [WorkflowTypeField(
+        "Workflow Type",
+        Description = "Type of workflow to start.",
+        Key = AttributeKey.WorkflowType,
+        Order = 0)]
+    [BooleanField(
+        "Show Summary View",
+        Description = "If workflow has been completed, should the summary view be displayed?",
+        Key = AttributeKey.ShowSummaryView,
+        Order = 1 )]
+    [CodeEditorField(
+        "Block Title Template",
+        Description = "Lava template for determining the title of the block. If not specified, the name of the Workflow Type will be shown.",
+        Key = AttributeKey.BlockTitleTemplate,
+        EditorMode = CodeEditorMode.Lava,
+        EditorTheme = CodeEditorTheme.Rock,
+        EditorHeight = 100,
+        IsRequired = true,
+        Order = 2)]
+    [TextField(
+        "Block Title Icon CSS Class",
+        Description = "The CSS class for the icon displayed in the block title. If not specified, the icon for the Workflow Type will be shown.",
+        Key = AttributeKey.BlockTitleIconCssClass,
+        Order = 3 )]
+
+    #endregion
+
     public partial class WorkflowEntry : Rock.Web.UI.RockBlock, IPostBackEventHandler
     {
+        #region Attribute Keys
+
+        /// <summary>
+        /// Keys to use for Block Attributes
+        /// </summary>
+        private static class AttributeKey
+        {
+            public const string WorkflowType = "WorkflowType";
+            public const string ShowSummaryView = "ShowSummaryView";
+            public const string BlockTitleTemplate = "BlockTitleTemplate";
+            public const string BlockTitleIconCssClass = "BlockTitleIconCssClass";
+        }
+
+        #endregion Attribute Keys
+
         #region Fields
 
         private RockContext _rockContext = null;
@@ -140,27 +182,8 @@ namespace RockWeb.Blocks.WorkFlow
             this.BlockUpdated += Block_BlockUpdated;
             this.AddConfigurationUpdateTrigger( upnlContent );
 
-            if ( _workflowType != null && !ConfiguredType )
-            {
-                RockPage.PageTitle = _workflowType.Name;
-
-                // we can only override if the page does not have a icon
-                if ( string.IsNullOrWhiteSpace( RockPage.PageIcon ) && !string.IsNullOrWhiteSpace( _workflowType.IconCssClass ) )
-                {
-                    RockPage.PageIcon = _workflowType.IconCssClass;
-                }
-            }
-            if ( _workflowType != null )
-            {
-                lTitle.Text = string.Format( "{0} Entry", _workflowType.WorkTerm );
-
-                if ( ! string.IsNullOrWhiteSpace( _workflowType.IconCssClass ) )
-                {
-                    lIconHtml.Text = string.Format( "<i class='{0}' ></i>", _workflowType.IconCssClass );
-                }
-            }
+            SetBlockTitle();
         }
-
 
         /// <summary>
         /// Raises the <see cref="E:System.Web.UI.Control.Load" /> event.
@@ -222,7 +245,7 @@ namespace RockWeb.Blocks.WorkFlow
         /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
         protected void Block_BlockUpdated( object sender, EventArgs e )
         {
-
+            SetBlockTitle();
         }
 
         /// <summary>
@@ -246,9 +269,9 @@ namespace RockWeb.Blocks.WorkFlow
             // Set the note type if this is first request
             if ( !Page.IsPostBack )
             {
-                var entityType = EntityTypeCache.Read( typeof( Rock.Model.Workflow ) );
+                var entityType = EntityTypeCache.Get( typeof( Rock.Model.Workflow ) );
                 var noteTypes = NoteTypeCache.GetByEntity( entityType.Id, string.Empty, string.Empty );
-                ncWorkflowNotes.NoteTypes = noteTypes;
+                ncWorkflowNotes.NoteOptions.SetNoteTypes( noteTypes );
             }
 
             if ( _workflowType == null )
@@ -346,7 +369,7 @@ namespace RockWeb.Blocks.WorkFlow
                     // attributes that might have the same key
                     foreach ( var param in RockPage.PageParameters() )
                     {
-                        if ( param.Value != null && param.Value.ToString().IsNotNullOrWhitespace() )
+                        if ( param.Value != null && param.Value.ToString().IsNotNullOrWhiteSpace() )
                         {
                             _workflow.SetAttributeValue( param.Key, param.Value.ToString() );
                         }
@@ -436,7 +459,7 @@ namespace RockWeb.Blocks.WorkFlow
             }
             else
             {
-                if ( GetAttributeValue("ShowSummaryView").AsBoolean() && !string.IsNullOrWhiteSpace( _workflowType.SummaryViewText ) )
+                if ( GetAttributeValue( AttributeKey.ShowSummaryView ).AsBoolean() && !string.IsNullOrWhiteSpace( _workflowType.SummaryViewText ) )
                 {
                     var mergeFields = Rock.Lava.LavaHelper.GetCommonMergeFields( this.RockPage, this.CurrentPerson );
                     mergeFields.Add( "Action", _action );
@@ -484,10 +507,10 @@ namespace RockWeb.Blocks.WorkFlow
             if ( !WorkflowTypeId.HasValue )
             {
                 // Get workflow type set by attribute value
-                Guid workflowTypeguid = GetAttributeValue( "WorkflowType" ).AsGuid();
+                Guid workflowTypeguid = GetAttributeValue( AttributeKey.WorkflowType ).AsGuid();
                 if ( !workflowTypeguid.IsEmpty() )
                 {
-                    _workflowType = WorkflowTypeCache.Read( workflowTypeguid );
+                    _workflowType = WorkflowTypeCache.Get( workflowTypeguid );
                 }
 
                 // If an attribute value was not provided, check for query/route value
@@ -506,7 +529,7 @@ namespace RockWeb.Blocks.WorkFlow
             // Get the workflow type 
             if ( _workflowType == null && WorkflowTypeId.HasValue )
             {
-                _workflowType = WorkflowTypeCache.Read( WorkflowTypeId.Value );
+                _workflowType = WorkflowTypeCache.Get( WorkflowTypeId.Value );
             }
         }
 
@@ -549,7 +572,7 @@ namespace RockWeb.Blocks.WorkFlow
             {
                 if ( formAttribute.IsVisible )
                 {
-                    var attribute = AttributeCache.Read( formAttribute.AttributeId );
+                    var attribute = AttributeCache.Get( formAttribute.AttributeId );
 
                     string value = attribute.DefaultValue;
                     if ( _workflow != null && _workflow.AttributeValues.ContainsKey( attribute.Key ) && _workflow.AttributeValues[attribute.Key] != null )
@@ -623,8 +646,7 @@ namespace RockWeb.Blocks.WorkFlow
 
             if ( form.AllowNotes.HasValue && form.AllowNotes.Value && _workflow != null && _workflow.Id != 0 )
             {
-                ncWorkflowNotes.EntityId = _workflow.Id;
-                ncWorkflowNotes.RebuildNotes( setValues );
+                ncWorkflowNotes.NoteOptions.EntityId = _workflow.Id;
                 ShowNotes( true );
             }
             else
@@ -642,7 +664,7 @@ namespace RockWeb.Blocks.WorkFlow
                     string buttonHtml = string.Empty;
                     if ( details.Length > 1 )
                     {
-                        var definedValue = DefinedValueCache.Read( details[1].AsGuid() );
+                        var definedValue = DefinedValueCache.Get( details[1].AsGuid() );
                         if ( definedValue != null )
                         {
                             buttonHtml = definedValue.GetAttributeValue( "ButtonHTML" );
@@ -655,7 +677,7 @@ namespace RockWeb.Blocks.WorkFlow
                     }
 
                     var buttonMergeFields = new Dictionary<string, object>();
-                    buttonMergeFields.Add( "ButtonText", details[0].EscapeQuotes() );
+                    buttonMergeFields.Add( "ButtonText", details[0].EncodeHtml() );
                     buttonMergeFields.Add( "ButtonClick",
                             string.Format( "if ( Page_ClientValidate('{0}') ) {{ $(this).button('loading'); return true; }} else {{ return false; }}",
                             BlockValidationGroup ) );
@@ -697,12 +719,12 @@ namespace RockWeb.Blocks.WorkFlow
                 {
                     if ( formAttribute.IsVisible && !formAttribute.IsReadOnly )
                     {
-                        var attribute = AttributeCache.Read( formAttribute.AttributeId );
+                        var attribute = AttributeCache.Get( formAttribute.AttributeId );
                         var control = phAttributes.FindControl( string.Format( "attribute_field_{0}", formAttribute.AttributeId ) );
 
                         if ( attribute != null && control != null)
                         {
-                            IHasAttributes item = null;
+                            Rock.Attribute.IHasAttributes item = null;
                             if ( attribute.EntityTypeId == _workflow.TypeId )
                             {
                                 item = _workflow;
@@ -768,10 +790,10 @@ namespace RockWeb.Blocks.WorkFlow
 
                 if ( _actionType.WorkflowForm.ActionAttributeGuid.HasValue )
                 {
-                    var attribute = AttributeCache.Read( _actionType.WorkflowForm.ActionAttributeGuid.Value );
+                    var attribute = AttributeCache.Get( _actionType.WorkflowForm.ActionAttributeGuid.Value );
                     if ( attribute != null )
                     {
-                        IHasAttributes item = null;
+                        Rock.Attribute.IHasAttributes item = null;
                         if ( attribute.EntityTypeId == _workflow.TypeId )
                         {
                             item = _workflow;
@@ -800,25 +822,35 @@ namespace RockWeb.Blocks.WorkFlow
                 List<string> errorMessages;
                 if ( _workflowService.Process( _workflow, out errorMessages ) )
                 {
-                    int? previousActionId = null;
+                    Guid? previousActionGuid = null;
                     
                     if ( _action != null )
                     {
-                        previousActionId = _action.Id;
+                        // Compare GUIDs since the IDs are DB generated and will be 0 if the workflow is not persisted.
+                        previousActionGuid = _action.Guid;
                     }
 
                     ActionTypeId = null;
                     _action = null;
                     _actionType = null;
                     _activity = null;
+                    bool hydrateObjectsResult = HydrateObjects();
 
-                    if ( HydrateObjects() && _action != null && _action.Id != previousActionId )
+                    if ( hydrateObjectsResult && _action != null && _action.Guid != previousActionGuid )
                     {
+                        // The block reloads the page with the workflow IDs as a parameter. At this point the workflow must be persisted regardless of user settings in order for the workflow to work.
+                        _workflowService.PersistImmediately( _action );
+
                         // If we are already being directed (presumably from the Redirect Action), don't redirect again.
                         if (!Response.IsRequestBeingRedirected)
                         {
                             var cb = CurrentPageReference;
                             cb.Parameters.AddOrReplace( "WorkflowId", _workflow.Id.ToString() );
+                            foreach ( var key in cb.QueryString.AllKeys.Where( k => !k.Equals( "Command", StringComparison.OrdinalIgnoreCase ) ) )
+                            {
+                                cb.Parameters.AddOrIgnore( key, cb.QueryString[key] );
+                            }
+                            cb.QueryString = new System.Collections.Specialized.NameValueCollection();
                             Response.Redirect( cb.BuildUrl(), false );
                             Context.ApplicationInstance.CompleteRequest();
                         }
@@ -827,7 +859,7 @@ namespace RockWeb.Blocks.WorkFlow
                     {
                         if ( lSummary.Text.IsNullOrWhiteSpace() )
                         {
-                            ShowMessage( NotificationBoxType.Success, string.Empty, responseText, ( _action == null || _action.Id != previousActionId ) );
+                            ShowMessage( NotificationBoxType.Success, string.Empty, responseText, ( _action == null || _action.Guid != previousActionGuid ) );
                         }
                         else
                         {
@@ -860,6 +892,74 @@ namespace RockWeb.Blocks.WorkFlow
                 pnlForm.Visible = false;
             }
 
+        }
+
+        /// <summary>
+        /// Set the properties of the block title bar.
+        /// </summary>
+        private void SetBlockTitle()
+        {
+            // Set the Block Title.
+            var blockTitle = GetAttributeValue( AttributeKey.BlockTitleTemplate );
+
+            if ( !string.IsNullOrWhiteSpace( blockTitle ) )
+            {
+                // Resolve the block title using the specified Lava template.
+                var mergeFields = Rock.Lava.LavaHelper.GetCommonMergeFields( RockPage, CurrentPerson );
+
+                mergeFields.Add( "WorkflowType", _workflowType );
+
+                // Add the WorkflowType as the default Item.
+                mergeFields.Add( "Item", _workflowType );
+
+                blockTitle = blockTitle.ResolveMergeFields( mergeFields );
+            }
+
+            // If the Block Title is blank, set the default.
+            if ( string.IsNullOrWhiteSpace( blockTitle ) )
+            {
+                if ( _workflowType != null && !ConfiguredType )
+                {
+                    blockTitle = string.Format( "{0} Entry", _workflowType.WorkTerm );
+                }
+            }
+
+            if ( !string.IsNullOrWhiteSpace( blockTitle ) )
+            {
+                lTitle.Text = blockTitle;
+            }
+            else
+            {
+                lTitle.Text = string.Format( "{0} Entry", _workflowType.WorkTerm );
+            }
+
+            // Set the Page Title to the Workflow Type name, unless the Workflow Type is restricted by a block configuration setting.
+            if ( _workflowType != null && !ConfiguredType )
+            {
+                RockPage.PageTitle = _workflowType.Name;
+            }
+
+            // Set the Block Icon.
+            var blockTitleIconCssClass = GetAttributeValue( AttributeKey.BlockTitleIconCssClass );
+
+            if ( string.IsNullOrWhiteSpace( blockTitleIconCssClass ) )
+            {
+                if ( _workflowType != null )
+                {
+                    blockTitleIconCssClass = _workflowType.IconCssClass;
+                }
+            }
+
+            if ( !string.IsNullOrWhiteSpace( blockTitleIconCssClass ) )
+            {
+                lIconHtml.Text = string.Format( "<i class='{0}' ></i>", blockTitleIconCssClass );
+
+                // If the Page Icon is not configured, set it to the same icon as the block.
+                if ( string.IsNullOrWhiteSpace( RockPage.PageIcon ) )
+                {
+                    RockPage.PageIcon = blockTitleIconCssClass;
+                }
+            }
         }
 
         #endregion

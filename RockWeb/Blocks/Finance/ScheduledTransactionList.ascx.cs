@@ -44,6 +44,9 @@ namespace RockWeb.Blocks.Finance
     [LinkedPage( "View Page", "", false )]
     [LinkedPage( "Add Page", "", false )]
     [AccountsField( "Accounts", "Limit the results to scheduled transactions that match the selected accounts.", false, "", "", 2 )]
+
+    [IntegerField( "Person Token Expire Minutes", "When adding a new scheduled transaction from a person detail page, the number of minutes the person token for the transaction is valid after it is issued.", true, 60, "", 3 )]
+    [IntegerField( "Person Token Usage Limit", "When adding a new scheduled transaction from a person detail page, the maximum number of times the person token for the transaction can be used.", false, 1, "", 4 )]
     [ContextAware]
     public partial class ScheduledTransactionList : RockBlock, ISecondaryBlock, ICustomGridColumns
     {
@@ -78,12 +81,15 @@ namespace RockWeb.Blocks.Finance
 
             gList.DataKeyNames = new string[] { "Id" };
             gList.Actions.ShowAdd = canEdit && !string.IsNullOrWhiteSpace( GetAttributeValue( "AddPage" ) );
+            gList.Actions.AddClick += gList_Add;
+
             gList.IsDeleteEnabled = canEdit;
 
             if ( !string.IsNullOrWhiteSpace( GetAttributeValue( "ViewPage" ) ) )
             {
                 gList.RowSelected += gList_Edit;
             }
+
             gList.GridRebind += gList_GridRebind;
 
             TargetPerson = ContextEntity<Person>();
@@ -114,7 +120,7 @@ namespace RockWeb.Blocks.Finance
         protected void gfSettings_ApplyFilterClick( object sender, EventArgs e )
         {
             gfSettings.SaveUserPreference( "Amount", nreAmount.DelimitedValues );
-            gfSettings.SaveUserPreference( "Frequency", ddlFrequency.SelectedValue != All.Id.ToString() ? ddlFrequency.SelectedValue : string.Empty );
+            gfSettings.SaveUserPreference( "Frequency", dvpFrequency.SelectedValue != All.Id.ToString() ? dvpFrequency.SelectedValue : string.Empty );
             gfSettings.SaveUserPreference( "Created", drpDates.DelimitedValues );
             gfSettings.SaveUserPreference( "Account", ddlAccount.SelectedValue != All.Id.ToString() ? ddlAccount.SelectedValue : string.Empty );
             gfSettings.SaveUserPreference( "Include Inactive", cbIncludeInactive.Checked ? "Yes" : string.Empty );
@@ -138,7 +144,7 @@ namespace RockWeb.Blocks.Finance
                     int definedValueId = 0;
                     if ( int.TryParse( e.Value, out definedValueId ) )
                     {
-                        var definedValue = DefinedValueCache.Read( definedValueId );
+                        var definedValue = DefinedValueCache.Get( definedValueId );
                         if ( definedValue != null )
                         {
                             e.Value = definedValue.Value;
@@ -199,7 +205,17 @@ namespace RockWeb.Blocks.Finance
         protected void gList_Add( object sender, EventArgs e )
         {
             var parms = new Dictionary<string, string>();
-            parms.Add( "Person", TargetPerson.UrlEncodedKey );
+            var addScheduledTransactionPage = new Rock.Web.PageReference( GetAttributeValue( "AddPage" ) );
+            if ( addScheduledTransactionPage != null )
+            {
+                // create a limited-use personkey that will last long enough for them to go thru all the 'postbacks' while posting a transaction
+                if ( this.TargetPerson != null )
+                {
+                    var impersonationToken = this.TargetPerson.GetImpersonationToken( DateTime.Now.AddMinutes( this.GetAttributeValue( "PersonTokenExpireMinutes" ).AsIntegerOrNull() ?? 60 ), this.GetAttributeValue( "PersonTokenUsageLimit" ).AsIntegerOrNull(), addScheduledTransactionPage.PageId );
+                    parms.Add( "Person", impersonationToken );
+                }
+            }
+            
             NavigateToLinkedPage( "AddPage", parms );
         }
 
@@ -224,12 +240,12 @@ namespace RockWeb.Blocks.Finance
         {
             nreAmount.DelimitedValues = gfSettings.GetUserPreference( "Amount" );
 
-            ddlFrequency.BindToDefinedType( DefinedTypeCache.Read( Rock.SystemGuid.DefinedType.FINANCIAL_FREQUENCY.AsGuid() ) );
-            ddlFrequency.Items.Insert( 0, new ListItem( string.Empty, string.Empty ) );
+            dvpFrequency.DefinedTypeId =DefinedTypeCache.Get( Rock.SystemGuid.DefinedType.FINANCIAL_FREQUENCY.AsGuid() ).Id;
+            dvpFrequency.Items.Insert( 0, new ListItem( string.Empty, string.Empty ) );
             string freqPreference = gfSettings.GetUserPreference( "Frequency" );
             if ( !string.IsNullOrWhiteSpace( freqPreference ))
             {
-                ddlFrequency.SetValue( freqPreference );
+                dvpFrequency.SetValue( freqPreference );
             }
 
             drpDates.DelimitedValues = gfSettings.GetUserPreference( "Created" );
@@ -269,7 +285,7 @@ namespace RockWeb.Blocks.Finance
             }
             else
             {
-                int personEntityTypeId = EntityTypeCache.Read( "Rock.Model.Person" ).Id;
+                int personEntityTypeId = EntityTypeCache.Get( "Rock.Model.Person" ).Id;
                 if ( !ContextTypesRequired.Any( e => e.Id == personEntityTypeId ) )
                 {
                     validRequest = true;

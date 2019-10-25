@@ -47,8 +47,13 @@ namespace RockWeb.Blocks.Reporting
     {% endif %}
     {% if InteractionChannel.ChannelTypeMediumValue != null and InteractionChannel.ChannelTypeMediumValue != '' %}
         <div class='col-md-6'>
-            <dl><dt>Name</dt><dd>{{ InteractionChannel.ChannelTypeMediumValue.Value }}<dd/></dl>
+            <dl><dt>Medium</dt><dd>{{ InteractionChannel.ChannelTypeMediumValue.Value }}<dd/></dl>
         </div>
+    {% endif %}
+    {% if InteractionChannel.EngagementStrength != null and InteractionChannel.EngagementStrength != '' %}
+      <div class='col-md-6'>
+          <dl><dt>Engagement Strength</dt><dd>{{ InteractionChannel.EngagementStrength }}<dd/></dl>
+       </div>
     {% endif %}
     {% if InteractionChannel.RetentionDuration != '' %}
         <div class='col-md-6'>
@@ -79,7 +84,7 @@ namespace RockWeb.Blocks.Reporting
             base.OnInit( e );
 
             btnDelete.Attributes["onclick"] = string.Format( "javascript: return Rock.dialogs.confirmDelete(event, '{0}');", InteractionChannel.FriendlyTypeName );
-            btnSecurity.EntityTypeId = EntityTypeCache.Read( typeof( Rock.Model.InteractionChannel ) ).Id;
+            btnSecurity.EntityTypeId = EntityTypeCache.Get( typeof( Rock.Model.InteractionChannel ) ).Id;
 
             // this event gets fired after block settings are updated. it's nice to repaint the screen if these settings would alter it
             this.BlockUpdated += Block_BlockUpdated;
@@ -185,6 +190,7 @@ namespace RockWeb.Blocks.Reporting
             {
                 _channel.Name = tbName.Text;
                 _channel.RetentionDuration = nbRetentionDuration.Text.AsIntegerOrNull();
+                _channel.EngagementStrength = nbEngagementStrength.Text.AsIntegerOrNull();
                 _channel.ChannelListTemplate = ceChannelList.Text;
                 _channel.ChannelDetailTemplate = ceChannelDetail.Text;
                 _channel.SessionListTemplate = ceSessionList.Text;
@@ -192,6 +198,7 @@ namespace RockWeb.Blocks.Reporting
                 _channel.ComponentDetailTemplate = ceComponentDetail.Text;
                 _channel.InteractionListTemplate = ceInteractionList.Text;
                 _channel.InteractionDetailTemplate = ceInteractionDetail.Text;
+                _channel.IsActive = cbIsActive.Checked;
 
                 _channel.ModifiedDateTime = RockDateTime.Now;
                 _channel.ModifiedByPersonAliasId = CurrentPersonAliasId;
@@ -232,7 +239,9 @@ namespace RockWeb.Blocks.Reporting
                 SetEditMode( true );
 
                 tbName.Text = _channel.Name;
+                cbIsActive.Checked = _channel.IsActive;
                 nbRetentionDuration.Text = _channel.RetentionDuration.ToString();
+                nbEngagementStrength.Text = _channel.EngagementStrength.ToStringSafe();
                 ceChannelList.Text = _channel.ChannelListTemplate;
                 ceChannelDetail.Text = _channel.ChannelDetailTemplate;
                 ceSessionList.Text = _channel.SessionListTemplate;
@@ -274,7 +283,7 @@ namespace RockWeb.Blocks.Reporting
                 lTitle.Text = _channel.Name.FormatAsHtmlTitle();
 
                 var mergeFields = Rock.Lava.LavaHelper.GetCommonMergeFields( this.RockPage, this.CurrentPerson );
-                mergeFields.AddOrIgnore( "Person", CurrentPerson );
+                mergeFields.AddOrIgnore( "CurrentPerson", CurrentPerson );
                 mergeFields.Add( "InteractionChannel", _channel );
 
                 string template = GetAttributeValue( "DefaultTemplate" );

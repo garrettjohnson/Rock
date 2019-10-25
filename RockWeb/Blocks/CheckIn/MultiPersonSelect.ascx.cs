@@ -45,8 +45,9 @@ namespace RockWeb.Blocks.CheckIn
     [TextField( "Title", "Title to display. Use {0} for family name.", false, "{0}", "Text", 7 )]
     [TextField( "Caption", "", false, "Select People", "Text", 8 )]
     [TextField( "Option Title", "Title to display on option screen. Use {0} for person's full name.", false, "{0}", "Text", 9 )]
-    [TextField( "Option Sub Title", "Sub-title to display on option screen. Use {0} for person's nick name.", false, "Please select the options that {0} would like to attend.", "Text", 10 )]
+    [TextField( "Option Sub Title", "Subtitle to display on option screen. Use {0} for person's nickname.", false, "Please select the options that {0} would like to attend.", "Text", 10 )]
     [TextField( "No Option Message", "", false, "Sorry, there are currently not any available areas that the selected people can check into.", "Text", 11 )]
+    [TextField( "Next Button Text", "", false, "Next", "Text", 12 )]
 
     public partial class MultiPersonSelect : CheckInBlock
     {
@@ -83,7 +84,7 @@ namespace RockWeb.Blocks.CheckIn
         }}
 
         $('a.js-person-select').click( function() {{
-            //$(this).toggleClass('btn-dimmed');
+            $(this).toggleClass('active');
             $(this).find('i').toggleClass('fa-check-square').toggleClass('fa-square-o');
             var ids = '';
             $('div.checkin-person-list').find('i.fa-check-square').each( function() {{
@@ -162,16 +163,20 @@ namespace RockWeb.Blocks.CheckIn
                     if ( family == null )
                     {
                         GoBack();
+                        return;
                     }
+
+                    lbEditFamily.Visible = CurrentCheckInState.Kiosk.RegistrationModeEnabled;
 
                     lTitle.Text = string.Format( GetAttributeValue( "Title" ), family.ToString() );
                     lCaption.Text = GetAttributeValue( "Caption" );
                     lCaption2.Text = lCaption.Text;
+                    lbSelect.Text = GetAttributeValue( "NextButtonText" );
 
                     if ( _autoCheckin )
                     {
                         // Because auto-checkin bypasses any other workflow processing, the check for previous check-ins needs to be done manually
-                        bool preventDuplicate = CurrentCheckInState.CheckInType.PreventDuplicateCheckin;
+                        bool preventDuplicate = !IsOverride && CurrentCheckInState.CheckInType.PreventDuplicateCheckin;
                         using ( var rockContext = new Rock.Data.RockContext() )
                         {
                             Rock.Workflow.Action.CheckIn.SetAvailableSchedules.ProcessForFamily( rockContext, family );
@@ -248,7 +253,7 @@ namespace RockWeb.Blocks.CheckIn
                         var pnlChangeButton = e.Item.FindControl( "pnlChangeButton" ) as Panel;
                         if ( pnlPersonButton != null && pnlChangeButton != null )
                         {
-                            pnlPersonButton.CssClass = "col-xs-12 col-sm-9 col-md-10";
+                            pnlPersonButton.CssClass = "checkin-person-btn checkin-person-has-change col-xs-12 col-sm-9 col-md-10";
                             pnlChangeButton.Visible = selectedOptions.Count > 1 || AnyUnselectedOptions( person );
                         }
                     }
@@ -264,9 +269,9 @@ namespace RockWeb.Blocks.CheckIn
                     {
                         lPersonButton.Text = string.Format( @"
 <div class='row'>
-    <div class='col-md-4 family-personselect'>{0}</div>
-    <div class='col-md-8 auto-select text-light'>
-        <div class='auto-select-caption'>is checking into...</div>
+    <div class='col-md-5 family-personselect'>{0}</div>
+    <div class='col-md-7 auto-select family-auto-select'>
+        <div class='auto-select-caption'>Current Selection</div>
         <div class='auto-select-details'>{1}</div>
     </div>
 </div>
@@ -460,6 +465,11 @@ namespace RockWeb.Blocks.CheckIn
                 string.Format( "<p>{0}</p>", GetAttributeValue( "NoOptionMessage" ) ) );
         }
 
+        protected string GetSelectedClass( bool selected )
+        {
+            return selected ? "active" : "";
+        }
+
         protected string GetCheckboxClass( bool selected )
         {
             return selected ? "fa fa-check-square fa-3x" : "fa fa-square-o fa-3x";
@@ -500,8 +510,8 @@ namespace RockWeb.Blocks.CheckIn
                 {
                     return string.Format( @"
 <div class='row'>
-    <div class='col-md-4 family-personselect'>{0}</div>
-    <div class='col-md-8 text-light'><small>is checking into...<br/>{1}</small></div>
+    <div class='col-md-5 family-personselect'>{0}</div>
+    <div class='col-md-7 auto-select family-auto-select'><div class='auto-select-caption'>Current Selection</div><div class='auto-select-details'>{1}</div></div>
 </div>
 ", person.Person.FullName, options.AsDelimited( "<br/>" ) );
                 }
@@ -666,6 +676,25 @@ namespace RockWeb.Blocks.CheckIn
                         }
                     }
                 }
+            }
+        }
+
+        /// <summary>
+        /// Handles the Click event of the lbEditFamily control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
+        protected void lbEditFamily_Click( object sender, EventArgs e )
+        {
+            if ( CurrentCheckInState == null )
+            {
+                return;
+            }
+
+            var editFamilyBlock = this.RockPage.ControlsOfTypeRecursive<CheckInEditFamilyBlock>().FirstOrDefault();
+            if ( editFamilyBlock != null && CurrentCheckInState.CheckIn.CurrentFamily != null )
+            {
+                editFamilyBlock.ShowEditFamily( CurrentCheckInState.CheckIn.CurrentFamily );
             }
         }
 

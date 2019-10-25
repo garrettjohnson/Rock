@@ -527,7 +527,7 @@ namespace RockWeb.Blocks.Connection
                     }
                 } );
 
-                ConnectionWorkflowService.FlushCachedTriggers();
+                ConnectionWorkflowService.RemoveCachedTriggers();
 
                 var qryParams = new Dictionary<string, string>();
                 qryParams["ConnectionTypeId"] = PageParameter( "ConnectionTypeId" );
@@ -600,6 +600,7 @@ namespace RockWeb.Blocks.Connection
             {
                 GroupsState.Remove( groupStateObj );
             }
+            nbArchivedPlacementGroupWarning.Visible = GroupsState.Where( g => g.IsArchived ).Any();
             BindGroupGrid();
         }
 
@@ -643,6 +644,7 @@ namespace RockWeb.Blocks.Connection
                     groupStateObj.CampusId = group.CampusId;
                     groupStateObj.CampusName = group.Campus != null ? group.Campus.Name : string.Empty;
                     groupStateObj.Guid = Guid.NewGuid();
+                    groupStateObj.IsArchived = group.IsArchived;
                     GroupsState.Add( groupStateObj );
                 }
             }
@@ -701,6 +703,9 @@ namespace RockWeb.Blocks.Connection
         /// </summary>
         private void BindGroupGrid()
         {
+            // Hide the campus column if the campus filter is not visible.
+            gConnectionOpportunityGroups.ColumnsOfType<RockBoundField>().First( c => c.DataField == "CampusName" ).Visible = rcwCampus.Visible;
+
             gConnectionOpportunityGroups.DataSource = GroupsState;
             gConnectionOpportunityGroups.DataBind();
         }
@@ -741,7 +746,7 @@ namespace RockWeb.Blocks.Connection
                 GroupConfigsState.Add( groupConfig );
             }
 
-            var groupType = GroupTypeCache.Read( ddlGroupType.SelectedValueAsInt() ?? 0 );
+            var groupType = GroupTypeCache.Get( ddlGroupType.SelectedValueAsInt() ?? 0 );
             if ( groupType != null )
             {
                 groupConfig.GroupTypeId = groupType.Id;
@@ -874,6 +879,7 @@ namespace RockWeb.Blocks.Connection
             {
                 ConnectorGroupsState.Remove( groupStateObj );
             }
+            nbArchivedConnectorGroupWarning.Visible = ConnectorGroupsState.Where( g => g.IsArchived ).Any();
             BindConnectorGroupsGrid();
         }
 
@@ -896,7 +902,7 @@ namespace RockWeb.Blocks.Connection
             connectorGroup.CampusId = cpCampus.SelectedCampusId;
             if ( connectorGroup.CampusId.HasValue )
             {
-                var campus = CampusCache.Read( connectorGroup.CampusId.Value );
+                var campus = CampusCache.Get( connectorGroup.CampusId.Value );
                 if ( campus != null )
                 {
                     connectorGroup.CampusName = campus.Name;
@@ -919,6 +925,7 @@ namespace RockWeb.Blocks.Connection
                 connectorGroup.GroupName = group.Name;
                 connectorGroup.GroupTypeName = group.GroupType != null ? group.GroupType.Name : string.Empty;
                 connectorGroup.GroupTypeId = group.GroupTypeId;
+                connectorGroup.IsArchived = group.IsArchived;
             }
 
             BindConnectorGroupsGrid();
@@ -987,6 +994,9 @@ namespace RockWeb.Blocks.Connection
         /// </summary>
         private void BindConnectorGroupsGrid()
         {
+            // Hide the campus column if the campus filter is not visible.
+            gConnectionOpportunityConnectorGroups.ColumnsOfType<RockBoundField>().First( c => c.DataField == "CampusName" ).Visible = rcwCampus.Visible;
+
             gConnectionOpportunityConnectorGroups.DataSource = ConnectorGroupsState;
             gConnectionOpportunityConnectorGroups.DataBind();
 
@@ -1011,7 +1021,7 @@ namespace RockWeb.Blocks.Connection
                     {
                         var people = new GroupMemberService( rockContext )
                             .Queryable().AsNoTracking()
-                            .Where( m => 
+                            .Where( m =>
                                 groupIds.Contains( m.GroupId ) &&
                                 m.GroupMemberStatus == GroupMemberStatus.Active )
                             .Select( m => m.Person )
@@ -1020,7 +1030,7 @@ namespace RockWeb.Blocks.Connection
                         {
                             var defaultConnector = new DefaultConnector();
 
-                            var campus = CampusCache.Read( campusId );
+                            var campus = CampusCache.Get( campusId );
                             defaultConnector.CampusId = campus.Id;
                             defaultConnector.CampusName = campus.Name;
                             defaultConnector.PersonAliasId = DefaultConnectors.ContainsKey( campusId ) ? DefaultConnectors[campusId] : (int?)null;
@@ -1082,7 +1092,7 @@ namespace RockWeb.Blocks.Connection
                 WorkflowsState.Add( workflowTypeStateObj );
             }
 
-            var workflowType = new WorkflowTypeService( new RockContext() ).Get( ddlWorkflowType.SelectedValueAsId().Value );
+            var workflowType = new WorkflowTypeService( new RockContext() ).Get( wpWorkflowType.SelectedValueAsId().Value );
             if ( workflowType != null )
             {
                 workflowTypeStateObj.WorkflowTypeId = workflowType.Id;
@@ -1110,14 +1120,14 @@ namespace RockWeb.Blocks.Connection
                     e.Row.AddCssClass( "inactive" );
 
                     var deleteField = gConnectionOpportunityWorkflows.Columns.OfType<DeleteField>().First();
-                    var cell = ( e.Row.Cells[gConnectionOpportunityWorkflows.Columns.IndexOf( deleteField )] as DataControlFieldCell ).Controls[0];
+                    var cell = ( e.Row.Cells[gConnectionOpportunityWorkflows.GetColumnIndex( deleteField )] as DataControlFieldCell ).Controls[0];
                     if ( cell != null )
                     {
                         cell.Visible = false;
                     }
 
                     var editField = gConnectionOpportunityWorkflows.Columns.OfType<EditField>().First();
-                    cell = ( e.Row.Cells[gConnectionOpportunityWorkflows.Columns.IndexOf( editField )] as DataControlFieldCell ).Controls[0];
+                    cell = ( e.Row.Cells[gConnectionOpportunityWorkflows.GetColumnIndex( editField )] as DataControlFieldCell ).Controls[0];
                     if ( cell != null )
                     {
                         cell.Visible = false;
@@ -1170,29 +1180,11 @@ namespace RockWeb.Blocks.Connection
         /// <param name="connectionOpportunityWorkflowGuid">The connection opportunity workflow unique identifier.</param>
         protected void gConnectionOpportunityWorkflows_ShowEdit( Guid connectionOpportunityWorkflowGuid )
         {
-            ddlWorkflowType.Items.Clear();
-            ddlWorkflowType.Items.Add( new ListItem( string.Empty, string.Empty ) );
-
-            foreach ( var workflowType in new WorkflowTypeService( new RockContext() ).Queryable().OrderBy( w => w.Name ) )
-            {
-                if ( workflowType.IsAuthorized( Authorization.VIEW, CurrentPerson ) )
-                {
-                    ddlWorkflowType.Items.Add( new ListItem( workflowType.Name, workflowType.Id.ToString() ) );
-                }
-            }
 
             var workflowTypeStateObj = WorkflowsState.FirstOrDefault( l => l.Guid.Equals( connectionOpportunityWorkflowGuid ) );
             if ( workflowTypeStateObj != null )
             {
-                if ( workflowTypeStateObj.WorkflowTypeId == null )
-                {
-                    ddlWorkflowType.SelectedValue = "0";
-                }
-                else
-                {
-                    ddlWorkflowType.SelectedValue = workflowTypeStateObj.WorkflowTypeId.ToString();
-                }
-
+                wpWorkflowType.SetValue( workflowTypeStateObj.WorkflowTypeId );
                 ddlTriggerType.SelectedValue = workflowTypeStateObj.TriggerType.ConvertToInt().ToString();
             }
 
@@ -1269,7 +1261,7 @@ namespace RockWeb.Blocks.Connection
 
                 case ConnectionWorkflowTriggerType.StatusChanged:
                     {
-                        var statusList = new ConnectionStatusService( rockContext ).Queryable().Where( s => s.ConnectionTypeId == connectionTypeId || s.ConnectionTypeId == null ).ToList();
+                        var statusList = new ConnectionStatusService( rockContext ).Queryable().Where( s => s.ConnectionTypeId == connectionTypeId || s.ConnectionTypeId == null ).OrderBy( a => a.Name ).ToList();
                         ddlPrimaryQualifier.Label = "From";
                         ddlPrimaryQualifier.Visible = true;
                         ddlPrimaryQualifier.Items.Clear();
@@ -1294,6 +1286,7 @@ namespace RockWeb.Blocks.Connection
                         var activityList = new ConnectionActivityTypeService( rockContext )
                             .Queryable().AsNoTracking()
                             .Where( a => a.ConnectionTypeId == connectionTypeId )
+                            .OrderBy( a => a.Name )
                             .ToList();
                         ddlPrimaryQualifier.Label = "Activity Type";
                         ddlPrimaryQualifier.Visible = true;
@@ -1482,9 +1475,25 @@ namespace RockWeb.Blocks.Connection
                 WorkflowsState.Add( new WorkflowTypeStateObj( connectionWorkflow ) );
             }
 
+            nbArchivedPlacementGroupWarning.Visible = false;
+            nbArchivedConnectorGroupWarning.Visible = false;
+
             GroupsState = new List<GroupStateObj>();
-            foreach( var opportunityGroup in connectionOpportunity.ConnectionOpportunityGroups )
+            foreach ( var opportunityGroup in connectionOpportunity.ConnectionOpportunityGroups )
             {
+                if ( opportunityGroup.Group == null )
+                {
+                    // Look for archived groups.
+                    var archivedGroup = new GroupService( new RockContext() )
+                        .GetArchived()
+                        .Where( a => a.Id == opportunityGroup.GroupId )
+                        .FirstOrDefault();
+                    if ( archivedGroup != null )
+                    {
+                        nbArchivedPlacementGroupWarning.Visible = true;
+                        opportunityGroup.Group = archivedGroup;
+                    }
+                }
                 GroupsState.Add( new GroupStateObj( opportunityGroup ) );
             }
 
@@ -1497,6 +1506,19 @@ namespace RockWeb.Blocks.Connection
             ConnectorGroupsState = new List<GroupStateObj>();
             foreach( var connectorGroup in connectionOpportunity.ConnectionOpportunityConnectorGroups )
             {
+                if (connectorGroup.ConnectorGroup == null )
+                {
+                    // Look for archived groups.
+                    var archivedGroup = new GroupService( new RockContext() )
+                        .GetArchived()
+                        .Where( a => a.Id == connectorGroup.ConnectorGroupId )
+                        .FirstOrDefault();
+                    if ( archivedGroup != null )
+                    {
+                        nbArchivedConnectorGroupWarning.Visible = true;
+                        connectorGroup.ConnectorGroup = archivedGroup;
+                    }
+                }
                 ConnectorGroupsState.Add( new GroupStateObj( connectorGroup ) );
             }
 
@@ -1504,7 +1526,7 @@ namespace RockWeb.Blocks.Connection
 
             DefaultConnectors = new Dictionary<int, int>();
             foreach( var campus in connectionOpportunity.ConnectionOpportunityCampuses
-                .Where( c => 
+                .Where( c =>
                     c.DefaultConnectorPersonAlias != null &&
                     c.DefaultConnectorPersonAlias.Person != null ) )
             {
@@ -1608,6 +1630,11 @@ namespace RockWeb.Blocks.Connection
         /// </summary>
         private void LoadDropDowns( ConnectionOpportunity connectionOpportunity )
         {
+            if ( CampusCache.All().Count == 1 )
+            {
+                rcwCampus.Visible = false;
+            }
+
             cblCampus.Items.Clear();
             cblCampus.DataSource = CampusCache.All();
             cblCampus.DataBind();
@@ -1752,6 +1779,7 @@ namespace RockWeb.Blocks.Connection
             public string GroupTypeName { get; set; }
             public string CampusName { get; set; }
             public int GroupTypeId { get; set; }
+            public bool IsArchived { get; set; }
 
             public GroupStateObj()
             {
@@ -1770,6 +1798,7 @@ namespace RockWeb.Blocks.Connection
                     GroupTypeId = opportunityGroup.Group.GroupTypeId;
                     CampusId = opportunityGroup.Group.CampusId;
                     CampusName = opportunityGroup.Group.Campus != null ? opportunityGroup.Group.Campus.Name : string.Empty;
+                    IsArchived = opportunityGroup.Group.IsArchived;
                 }
             }
 
@@ -1783,6 +1812,7 @@ namespace RockWeb.Blocks.Connection
                     GroupName = connectorGroup.ConnectorGroup.Name;
                     GroupTypeName = connectorGroup.ConnectorGroup.GroupType != null ? connectorGroup.ConnectorGroup.GroupType.Name : string.Empty;
                     GroupTypeId = connectorGroup.ConnectorGroup.GroupTypeId;
+                    IsArchived = connectorGroup.ConnectorGroup.IsArchived;
                 }
                 if ( connectorGroup.Campus != null )
                 {

@@ -153,7 +153,7 @@ namespace RockWeb.Blocks.Crm
                     var lUserAgent = e.Item.FindControl( "lUserAgent" ) as Literal;
 
                     lClientIcon.Text = string.Format(
-                        "<div class='pageviewsession-client pull-right'><div class='pull-left'><small>{0}<br>{1}</small></div><i class='fa {2} fa-2x pull-right'></i></div>",
+                        "<div class='pageviewsession-client pull-right'><div class='pull-left margin-r-sm'><small>{0}<br>{1}</small></div><i class='fa {2} fa-2x pull-right'></i></div>",
                         session.PageViewSession.DeviceType.Application,
                         session.PageViewSession.DeviceType.OperatingSystem,
                         icon );
@@ -251,7 +251,7 @@ namespace RockWeb.Blocks.Crm
 
                 if ( siteId != -1 )
                 {
-                    var site = SiteCache.Read( siteId );
+                    var site = SiteCache.Get( siteId );
 
                     string siteName = string.Empty;
                     if (site != null )
@@ -259,7 +259,7 @@ namespace RockWeb.Blocks.Crm
                         siteName = site.Name;
                     }
                     // lookup the interactionDeviceType, and create it if it doesn't exist
-                    int channelMediumValueId = DefinedValueCache.Read( Rock.SystemGuid.DefinedValue.INTERACTIONCHANNELTYPE_WEBSITE.AsGuid() ).Id;
+                    int channelMediumValueId = DefinedValueCache.Get( Rock.SystemGuid.DefinedValue.INTERACTIONCHANNELTYPE_WEBSITE.AsGuid() ).Id;
 
                     var interactionChannelId = new InteractionChannelService( rockContext ).Queryable()
                                                         .Where( a => a.ChannelTypeMediumValueId == channelMediumValueId && a.ChannelEntityId == siteId )
@@ -360,7 +360,7 @@ namespace RockWeb.Blocks.Crm
         #endregion
 
         /// <summary>
-        /// Special class just for this block 
+        /// Special class just for this block
         /// </summary>
         public class WebSession
         {

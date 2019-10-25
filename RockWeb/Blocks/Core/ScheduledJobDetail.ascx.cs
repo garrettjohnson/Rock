@@ -26,6 +26,7 @@ using Rock.Constants;
 using Rock.Data;
 using Rock.Model;
 using Rock.Security;
+using Rock.Web.Cache;
 using Rock.Web.UI;
 
 namespace RockWeb.Blocks.Administration
@@ -51,15 +52,6 @@ namespace RockWeb.Blocks.Administration
             if ( !Page.IsPostBack )
             {
                 ShowDetail( PageParameter( "serviceJobId" ).AsInteger() );
-            }
-
-            if ( pnlDetails.Visible )
-            {
-                var job = new ServiceJob { Id = int.Parse( hfId.Value ), Class = ddlJobTypes.SelectedValue ?? "Rock.Jobs.JobPulse" };
-
-                job.LoadAttributes();
-                phAttributes.Controls.Clear();
-                Rock.Attribute.Helper.AddEditControls( job, phAttributes, true, BlockValidationGroup );
             }
         }
 
@@ -138,8 +130,7 @@ namespace RockWeb.Blocks.Administration
             {
                 rockContext.SaveChanges();
 
-                job.LoadAttributes( rockContext );
-                Rock.Attribute.Helper.GetEditValues( phAttributes, job );
+                avcAttributes.GetEditValues( job );
                 job.SaveAttributeValues( rockContext );
 
             } );
@@ -167,8 +158,21 @@ namespace RockWeb.Blocks.Administration
 
             job.Class = ddlJobTypes.SelectedValue;
             job.LoadAttributes();
-            phAttributes.Controls.Clear();
-            Rock.Attribute.Helper.AddEditControls( job, phAttributes, true, BlockValidationGroup );
+            if ( tbDescription.Text.IsNullOrWhiteSpace() && tbName.Text.IsNullOrWhiteSpace() )
+            {
+                try
+                {
+                    Type selectedJobType = Rock.Reflection.FindType( typeof( Quartz.IJob ), job.Class );
+                    tbName.Text = Rock.Reflection.GetDisplayName( selectedJobType );
+                    tbDescription.Text = Rock.Reflection.GetDescription( selectedJobType );
+                }
+                catch
+                {
+                    // ignore if there is a problem getting the description from the selected job.class
+                }
+            }
+
+            avcAttributes.AddEditControls( job );
         }
 
         /// <summary>
@@ -212,7 +216,7 @@ namespace RockWeb.Blocks.Administration
             tbName.Text = job.Name;
             tbDescription.Text = job.Description;
             cbActive.Checked = job.IsActive.HasValue ? job.IsActive.Value : false;
-            if ( job.Class.IsNotNullOrWhitespace() )
+            if ( job.Class.IsNotNullOrWhiteSpace() )
             {
                 if ( ddlJobTypes.Items.FindByValue( job.Class ) == null )
                 {
@@ -244,8 +248,7 @@ namespace RockWeb.Blocks.Administration
             }
 
             job.LoadAttributes();
-            phAttributes.Controls.Clear();
-            Rock.Attribute.Helper.AddEditControls( job, phAttributes, true, BlockValidationGroup );
+            avcAttributes.AddEditControls( job );
 
             // render UI based on Authorized and IsSystem
             bool readOnly = false;
@@ -266,9 +269,9 @@ namespace RockWeb.Blocks.Administration
             {
                 lActionTitle.Text = ActionTitle.View( ServiceJob.FriendlyTypeName ).FormatAsHtmlTitle();
                 btnCancel.Text = "Close";
-                Rock.Attribute.Helper.AddDisplayControls( job, phAttributesReadOnly );
-                phAttributesReadOnly.Visible = true;
-                phAttributes.Visible = false;
+                avcAttributesReadOnly.AddDisplayControls( job );
+                avcAttributesReadOnly.Visible = true;
+                avcAttributes.Visible = false;
                 tbCronExpression.Text = job.CronExpression;
             }
             
@@ -290,7 +293,7 @@ namespace RockWeb.Blocks.Administration
         {
             ddlNotificationStatus.BindToEnum<JobNotificationStatus>();
 
-            int? jobEntityTypeId = Rock.Web.Cache.EntityTypeCache.Read( "Rock.Model.ServiceJob" ).Id;
+            int? jobEntityTypeId = EntityTypeCache.Get( "Rock.Model.ServiceJob" ).Id;
 
             var jobs = Rock.Reflection.FindTypes( typeof( Quartz.IJob ) ).Values;
 

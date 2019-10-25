@@ -26,8 +26,17 @@ namespace Rock.CheckIn
     /// A family option for the current check-in
     /// </summary>
     [DataContract]
-    public class CheckInFamily
+    public class CheckInFamily : DotLiquid.Drop
     {
+        /// <summary>
+        /// A list of attendance records for the family check-in.
+        /// </summary>
+        /// <value>
+        /// A list of attendance Ids.
+        /// </value>
+        [DataMember]
+        public List<int> AttendanceIds { get; set; }
+
         /// <summary>
         /// Gets or sets the group.
         /// </summary>
@@ -54,6 +63,17 @@ namespace Rock.CheckIn
         /// </value>
         [DataMember]
         public List<CheckInPerson> People { get; set; }
+
+        /// <summary>
+        /// Gets or sets the list of original people that this family could check-in (or check-out)
+        /// before any of them are removed due to not having anything to check-in for.  We need this
+        /// because they may be able to check-out.
+        /// </summary>
+        /// <value>
+        /// The people.
+        /// </value>
+        [DataMember]
+        public List<CheckInPerson> OriginalPeople { get; set; }
 
         /// <summary>
         /// Gets the current person if using family check-in mode
@@ -103,12 +123,23 @@ namespace Rock.CheckIn
         public string SubCaption { get; set; }
 
         /// <summary>
+        /// Gets or sets the first names of the people in the Family
+        /// </summary>
+        /// <value>
+        /// The first names.
+        /// </value>
+        [DataMember]
+        public List<string> FirstNames { get; set; }
+
+        /// <summary>
         /// Initializes a new instance of the <see cref="CheckInFamily" /> class.
         /// </summary>
         public CheckInFamily()
             : base()
         {
+            AttendanceIds = new List<int>();
             People = new List<CheckInPerson>();
+            OriginalPeople = new List<CheckInPerson>();
             Action = CheckinAction.CheckIn;
             CheckOutPeople = new List<CheckOutPerson>();
         }

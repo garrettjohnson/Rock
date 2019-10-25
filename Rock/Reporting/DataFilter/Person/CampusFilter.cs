@@ -20,6 +20,7 @@ using System.ComponentModel.Composition;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Web.UI;
+
 using Rock.Data;
 using Rock.Model;
 using Rock.Web.Cache;
@@ -49,15 +50,20 @@ namespace Rock.Reporting.DataFilter.Person
         }
 
         /// <summary>
-        /// Gets the section.
+        /// Gets the name of the section in which the filter should be displayed in a browsable list.
         /// </summary>
         /// <value>
-        /// The section.
+        /// The section name.
         /// </value>
-        public override string Section
-        {
-            get { return "Additional Filters"; }
-        }
+        public override string Section => "Additional Filters";
+
+        /// <summary>
+        /// Set this to show descriptive text that can help explain how complex filters work or offer assistance on possibly other filters that have better performance.
+        /// </summary>
+        /// <value>
+        /// The description.
+        /// </value>
+        public override string Description => "Consider using the 'Primary Campus' filter if you are concerned with speed. This filter is slower as it checks the campus of all families the person might belong to.";
 
         /// <summary>
         /// Gets the control class name.
@@ -132,7 +138,7 @@ function() {{
             if ( selectionValues.Length >= 1 )
             {
                 Guid campusGuid = selectionValues[0].AsGuid();
-                var campus = CampusCache.Read( campusGuid );
+                var campus = CampusCache.Get( campusGuid );
                 if ( campus != null )
                 {
                     result = "Campus: " + campus.Name;
@@ -182,7 +188,7 @@ function() {{
             var campusId = ( controls[0] as CampusPicker ).SelectedCampusId;
             if ( campusId.HasValue )
             {
-                var campus = CampusCache.Read( campusId.Value );
+                var campus = CampusCache.Get( campusId.Value );
                 if ( campus != null )
                 {
                     return campus.Guid.ToString();
@@ -204,7 +210,7 @@ function() {{
             if ( selectionValues.Length >= 1 )
             {
                 var campusPicker = controls[0] as CampusPicker;
-                var selectedCampus = CampusCache.Read( selectionValues[0].AsGuid() );
+                var selectedCampus = CampusCache.Get( selectionValues[0].AsGuid() );
                 if ( selectedCampus != null )
                 {
                     campusPicker.SelectedCampusId = selectedCampus.Id;
@@ -239,7 +245,7 @@ function() {{
 
                 if ( campusId.HasValue )
                 {
-                    var selectedCampus = CampusCache.Read( campusId.Value );
+                    var selectedCampus = CampusCache.Get( campusId.Value );
                     if ( selectedCampus != null )
                     {
                         selectionValues[0] = selectedCampus.Guid.ToString();
@@ -266,7 +272,7 @@ function() {{
             string[] selectionValues = selection.Split( '|' );
             if ( selectionValues.Length >= 1 )
             {
-                var campus = CampusCache.Read( selectionValues[0].AsGuid() );
+                var campus = CampusCache.Get( selectionValues[0].AsGuid() );
                 if ( campus == null )
                 {
                     return null;

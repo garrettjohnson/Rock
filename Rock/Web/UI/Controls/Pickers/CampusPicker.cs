@@ -35,8 +35,16 @@ namespace Rock.Web.UI.Controls
             : base()
         {
             Label = "Campus";
-            CampusIds = CampusCache.All().Select( c => c.Id ).ToList();
         }
+
+        /// <summary>
+        /// By default the campus picker is not visible if there is only one campus.
+        /// Set this to true if it should be displayed regardless of the number of active campuses.
+        /// </summary>
+        /// <value>
+        ///   <c>true</c> if [force visible]; otherwise, <c>false</c>.
+        /// </value>
+        public bool ForceVisible { get; set; } = false;
 
         /// <summary>
         /// Handles the <see cref="E:System.Web.UI.Control.Load" /> event.
@@ -59,19 +67,31 @@ namespace Rock.Web.UI.Controls
         /// </value>
         private List<int> CampusIds
         {
-            get { return ViewState["CampusIds"] as List<int> ?? new List<int>(); }
-            set { ViewState["CampusIds"] = value; }
+            get
+            {
+                return ViewState["CampusIds"] as List<int> ?? CampusCache.All().Select( c => c.Id ).ToList();
+
+            }
+
+            set
+            {
+                ViewState["CampusIds"] = value;
+            }
         }
 
         /// <summary>
-        /// Gets or sets a value indicating whether [include inactive].
+        /// Gets or sets a value indicating whether [include inactive] (defaults to True).
         /// </summary>
         /// <value>
         ///   <c>true</c> if [include inactive]; otherwise, <c>false</c>.
         /// </value>
         public bool IncludeInactive
         {
-            get { return ViewState["IncludeInactive"] as bool? ?? true; }
+            get
+            {
+                return ViewState["IncludeInactive"] as bool? ?? true;
+            }
+
             set
             {
                 ViewState["IncludeInactive"] = value;
@@ -117,6 +137,14 @@ namespace Rock.Web.UI.Controls
                 {
                     li.Selected = true;
                 }
+                else
+                {
+                    // if setting CampusId to NULL or 0, just default to the first item in the list (which should be nothing)
+                    if ( this.Items.Count > 0 )
+                    {
+                        this.SelectedIndex = 0;
+                    }
+                }
             }
         }
 
@@ -127,9 +155,9 @@ namespace Rock.Web.UI.Controls
         /// <param name="value">The value.</param>
         public void CheckItem( int? value )
         {
-            if ( value.HasValue &&
+            if ( value.HasValue && value.Value > 0 &&
                 this.Items.FindByValue( value.Value.ToString() ) == null &&
-                CampusCache.Read( value.Value ) != null )
+                CampusCache.Get( value.Value ) != null )
             {
                 LoadItems( value );
             }
@@ -141,23 +169,43 @@ namespace Rock.Web.UI.Controls
         /// <param name="selectedValue">The selected value.</param>
         private void LoadItems( int? selectedValue )
         {
-            string firstItemText = Items.Count > 0 && Items[0].Value == string.Empty ? Items[0].Text : string.Empty;
-
-            var selectedItems = Items.Cast<ListItem>()
-                .Where( i => i.Selected )
-                .Select( i => i.Value ).AsIntegerList();
-
-            Items.Clear();
-
-            // add Empty option first
-            Items.Add( new ListItem( firstItemText, string.Empty ) );
-
+            // Get all the campi
             var campuses = CampusCache.All()
                 .Where( c =>
                     ( CampusIds.Contains( c.Id ) && ( !c.IsActive.HasValue || c.IsActive.Value || IncludeInactive ) ) ||
                     ( selectedValue.HasValue && c.Id == selectedValue.Value ) )
-                .OrderBy( c => c.Name )
+                .OrderBy( c => c.Order )
                 .ToList();
+
+            // Get the current text for the first item if its value is empty
+            string firstItemText = Items.Count > 0 && Items[0].Value == string.Empty ? Items[0].Text : string.Empty;
+
+            List<int> selectedItems = new List<int>();
+
+            // If there is one campus then only show if ForceVisible is true.
+            if ( campuses.Count == 1 )
+            {
+                this.Visible = ForceVisible;
+
+                // if this is required then auto-select the only campus
+                if ( this.Required )
+                {
+                    selectedItems.Add( campuses[0].Id );
+                }
+            }
+            else
+            {
+                this.Visible = true;
+
+                selectedItems = Items.Cast<ListItem>()
+                .Where( i => i.Selected )
+                .Select( i => i.Value ).AsIntegerList();
+            }
+
+            Items.Clear();
+
+            // Add a blank first item.
+            Items.Add( new ListItem( firstItemText, string.Empty ) );
 
             foreach ( CampusCache campus in campuses )
             {
