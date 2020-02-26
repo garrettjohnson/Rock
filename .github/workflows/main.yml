@@ -8,6 +8,13 @@ jobs:
     runs-on: windows-latest
 
     steps:
+      - name: Copy .net
+        shell: pwsh
+        run: |
+       $src = (Join-Path ([Environment]::GetFolderPath("ProgramFilesX86")) "Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5.2\Facades")
+       $dst = (Join-Path ([Environment]::GetFolderPath("ProgramFilesX86")) "Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5.2")
+       Get-ChildItem $src | Copy-Item -Destination $dst -Force
+       
     - uses: actions/checkout@v2
     - name: Setup Nuget.exe
       uses: warrenbuckley/Setup-Nuget@v1
