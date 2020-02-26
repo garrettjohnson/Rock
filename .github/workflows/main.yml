@@ -11,16 +11,14 @@ jobs:
       - name: Copy .net
         shell: pwsh
         run: |
-       $src = (Join-Path ([Environment]::GetFolderPath("ProgramFilesX86")) "Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5.2\Facades")
-       $dst = (Join-Path ([Environment]::GetFolderPath("ProgramFilesX86")) "Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5.2")
-       Get-ChildItem $src | Copy-Item -Destination $dst -Force
-       
-    - uses: actions/checkout@v2
-    - name: Setup Nuget.exe
-      uses: warrenbuckley/Setup-Nuget@v1
-    - name: Restore packages
-      run: nuget restore Rock.sln
-    - name: Setup msbuild
-      uses: microsoft/setup-msbuild@v1
-    - name: Build with MSBuild
-      run: msbuild Rock.sln -t:Clean,Build -p:Configuration=Release
+            Get-ChildItem (Join-Path ([Environment]::GetFolderPath("ProgramFilesX86")) "Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5.2\Facades") | Copy-Item -Destination (Join-Path ([Environment]::GetFolderPath("ProgramFilesX86")) "Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5.2") -Force
+
+      - uses: actions/checkout@v2
+      - name: Setup Nuget.exe
+        uses: warrenbuckley/Setup-Nuget@v1
+      - name: Restore packages
+        run: nuget restore Rock.sln
+      - name: Setup msbuild
+        uses: microsoft/setup-msbuild@v1
+      - name: Build with MSBuild
+        run: msbuild Rock.sln -t:Clean,Build -p:Configuration=Release
