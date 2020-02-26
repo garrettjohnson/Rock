@@ -16,4 +16,4 @@ jobs:
     - name: Setup msbuild
       uses: microsoft/setup-msbuild@v1
     - name: Build with MSBuild
-      run: msbuild Rock.sln -p:Configuration=Release
+      run: msbuild Rock.sln -t:Clean,Build -p:Configuration=Release
