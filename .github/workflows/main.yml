@@ -8,17 +8,24 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - name: Copy .net
-        shell: pwsh
-        run: |
+    - uses: actions/checkout@v2
+      name: Checkout
+    - name: Setup Nuget.exe
+      uses: warrenbuckley/Setup-Nuget@v1
+    - uses: actions/cache@v1
+    - name: Cache Nuget Packages
+      id: cache
+      with:
+          path: packages
+          key: ${{ runner.os }}-${{ hashFiles('**/packages.lock.json') }}
+    - name: Copy .net
+      shell: pwsh
+      run: |
             Get-ChildItem (Join-Path ([Environment]::GetFolderPath("ProgramFilesX86")) "Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5.2\Facades") | Copy-Item -Destination (Join-Path ([Environment]::GetFolderPath("ProgramFilesX86")) "Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5.2") -Force
 
-      - uses: actions/checkout@v2
-      - name: Setup Nuget.exe
-        uses: warrenbuckley/Setup-Nuget@v1
-      - name: Restore packages
-        run: nuget restore Rock.sln
-      - name: Setup msbuild
-        uses: microsoft/setup-msbuild@v1
-      - name: Build with MSBuild
-        run: msbuild Rock.sln -t:Clean,Build -p:Configuration=Release
+    - name: Restore Packages
+      run: nuget restore Rock.sln
+    - name: Setup MSbuild
+      uses: microsoft/setup-msbuild@v1
+    - name: Build with MSBuild
+      run: msbuild Rock.sln -t:Clean,Build -p:Configuration=Release
